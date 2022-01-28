@@ -54,5 +54,6 @@ contract CDOPersonalToken is Initializable, ERC20PresetMinterPauserUpgradeable {
             "CDOPersonalToken: must have admin role to activate"
         );
         _mint(treasury, initialSupply);
+        unpause();
     }
 }
