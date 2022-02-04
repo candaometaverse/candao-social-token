@@ -3,7 +3,8 @@
 //
 // When running the script with `npx hardhat run <script>` you'll find the Hardhat
 // Runtime Environment's members available in the global scope.
-const hre = require("hardhat");
+const { ethers, upgrades } = require("hardhat");
+require("dotenv").config()
 
 async function main() {
   // Hardhat always runs the compile task when running scripts with its command
@@ -14,12 +15,17 @@ async function main() {
   // await hre.run('compile');
 
   // We get the contract to deploy
-  const Greeter = await hre.ethers.getContractFactory("Greeter");
-  const greeter = await Greeter.deploy("Hello, Hardhat!");
+  const CDOPersonalToken = await ethers.getContractFactory("CDOPersonalToken");
+  const cdoPT = await upgrades.deployProxy(CDOPersonalToken, ['CDOPersonalToken', 'CDO']);
 
-  await greeter.deployed();
+  await cdoPT.deployed();
+  console.log("CDOPersonalToken deployed to:", cdoPT.address);
 
-  console.log("Greeter deployed to:", greeter.address);
+  const CDOBondingCurve = await ethers.getContractFactory("CDOBondingCurve");
+  const bondingcurve_instance = await CDOBondingCurve.deploy(cdoPT.address, process.env.PT_TREASURY, process.env.PROTOCOL_TREASURY, process.env.USDT_ADDRESS);
+
+  console.log("CDO Bonding Curve deployed to:", bondingcurve_instance.address);
+
 }
 
 // We recommend this pattern to be able to use async/await everywhere

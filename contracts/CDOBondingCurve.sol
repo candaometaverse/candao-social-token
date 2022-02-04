@@ -152,6 +152,15 @@ contract CDOBondingCurve is AccessControl, ReentrancyGuard {
         currentPrice = marketCap.div(token.totalSupply());
     }
 
+    function upgradeUSDT(address _usdt) external {
+        require(
+            hasRole(DEFAULT_ADMIN_ROLE, _msgSender()),
+            "CDOPersonalToken: must have admin role to upgrade"
+        );
+
+        usdt_token = _usdt;
+    }
+
     /**
      * @notice Open market making [enabling users to open buy and sell orders]
      */

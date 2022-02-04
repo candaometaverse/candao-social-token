@@ -19,6 +19,9 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
  * and pauser roles to other accounts.
  */
 contract CDOPersonalToken is Initializable, ERC20PresetMinterPauserUpgradeable {
+
+    bytes32 public constant ACTIVATE_ROLE = keccak256("ACTIVATE_ROLE");
+
     /**
      * @dev Initialize token name as `name` & symbol as `symbol`
      *
@@ -40,6 +43,23 @@ contract CDOPersonalToken is Initializable, ERC20PresetMinterPauserUpgradeable {
     }
 
     /**
+     * @dev Setup `ACTIVATE_ROLE` to `_bondingCurve`
+     *
+     * See {AccessControlUpgradeable -_setupRole}
+     *
+     * Requirements:
+     *
+     * - the caller must have the `DEFAULT_ADMIN_ROLE`.
+     */
+    function SetupActivateRole(address _bondingCurve) external {
+        require(
+            hasRole(DEFAULT_ADMIN_ROLE, _msgSender()),
+            "CDOPersonalToken: must have admin role to setup role"
+        );
+        _setupRole(ACTIVATE_ROLE, _bondingCurve);
+    }
+
+    /**
      * @dev Setup `initialSupply` new tokesn to `treasury`
      *
      * See {ERC20-_mint}
@@ -50,8 +70,8 @@ contract CDOPersonalToken is Initializable, ERC20PresetMinterPauserUpgradeable {
      */
     function activate(address treasury, uint256 initialSupply) external {
         require(
-            hasRole(DEFAULT_ADMIN_ROLE, _msgSender()),
-            "CDOPersonalToken: must have admin role to activate"
+            hasRole(ACTIVATE_ROLE, _msgSender()),
+            "CDOPersonalToken: must have activation role to activate"
         );
         _mint(treasury, initialSupply);
         unpause();
