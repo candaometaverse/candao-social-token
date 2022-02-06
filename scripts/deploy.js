@@ -19,6 +19,8 @@ async function main() {
   const cdoPT = await upgrades.deployProxy(CDOPersonalToken, ['CDOPersonalToken', 'CDO']);
 
   await cdoPT.deployed();
+  const implAddress = upgrades.erc1967.getImplementationAddress(cdoPT.address);
+  console.log(implAddress);
   console.log("CDOPersonalToken deployed to:", cdoPT.address);
 
   const CDOBondingCurve = await ethers.getContractFactory("CDOBondingCurve");

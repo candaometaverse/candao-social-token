@@ -14,8 +14,8 @@ node scripts/sample-script.js
 npx hardhat help
 ```
 ``` Mumbai Testnet Deployments
-CDOPersonalToken Deployed to: 0x99e4a470532a69b1De4EE35C0586202a7596160F
-CDOBondingCurve Deployed to: 0xB674D7072D0128D855833732722cfC677852dFD5
+CDOPersonalToken Deployed to: 0x1e2393a4F760385D79f362d7D8a09562937a72FB
+CDOBondingCurve Deployed to: 0x91Adf8020aA4b43425D0dd98bFF81FC948FC5123
 ```
 
 ``` CDO Bonding Curve Overview
@@ -83,4 +83,12 @@ When someone sell CDOPT, the token price would be changed on CDO BondingCurve Pr
         protocolTreasuryAmount = protocolTreasuryAmount.add(_ProtocolAmount);
         currentPrice = marketCap.div(token.totalSupply());
     }
+```
+``` How to test bonding curve on mumbai test net
+1. Browse polygon scan with contract argument
+https://mumbai.polygonscan.com/address/0x91Adf8020aA4b43425D0dd98bFF81FC948FC5123#code
+2. Using admin role, activate market at the first.
+    Initial Supply = 10000 CDOPT
+    _depositAmount will control initial price based on initial supply
+3. Do acttions- buy& sell
 ```
