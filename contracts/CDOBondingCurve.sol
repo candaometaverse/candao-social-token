@@ -20,7 +20,7 @@ contract CDOBondingCurve is AccessControl, ReentrancyGuard {
     bytes32 public constant OPEN_ROLE =
         0xefa06053e2ca99a43c97c4a4f3d8a394ee3323a8ff237e625fba09fe30ceb0a4;
 
-    uint256 public constant INITIAL_SUPPLY = 10000 * 10**18; // 10 000 CDO
+    uint256 public constant INITIAL_SUPPLY = 10**18;
     uint8 public constant PCT_BASE = 100;
     uint8 public constant FEE_BASE = 25;
     uint8 public constant MC_AGGREGATION = 23;
@@ -82,12 +82,12 @@ contract CDOBondingCurve is AccessControl, ReentrancyGuard {
         usdt_token = _usdtToken;
     }
 
-    function activate(address _treasury, uint256 _depositAmount) external {
+    function activate(uint256 _depositAmount) external {
         require(
             hasRole(DEFAULT_ADMIN_ROLE, _msgSender()),
             "CDOPersonalToken: must have admin role to activate"
         );
-        token.activate(_treasury, INITIAL_SUPPLY);
+        token.activate(INITIAL_SUPPLY);
         marketCap = _depositAmount.add(
             _calculateFee(_depositAmount).mul(uint256(MC_AGGREGATION)).div(
                 uint256(FEE_BASE)

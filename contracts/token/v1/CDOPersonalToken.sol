@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/presets/ERC20PresetMinterPauserUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -51,7 +51,7 @@ contract CDOPersonalToken is Initializable, ERC20PresetMinterPauserUpgradeable {
      *
      * - the caller must have the `DEFAULT_ADMIN_ROLE`.
      */
-    function SetupActivateRole(address _bondingCurve) external {
+    function setupActivateRole(address _bondingCurve) external {
         require(
             hasRole(DEFAULT_ADMIN_ROLE, _msgSender()),
             "CDOPersonalToken: must have admin role to setup role"
@@ -68,12 +68,12 @@ contract CDOPersonalToken is Initializable, ERC20PresetMinterPauserUpgradeable {
      *
      * - the caller must have the `DEFAULT_ADMIN_ROLE`.
      */
-    function activate(address treasury, uint256 initialSupply) external {
+    function activate(uint256 initialSupply) external {
         require(
             hasRole(ACTIVATE_ROLE, _msgSender()),
             "CDOPersonalToken: must have activation role to activate"
         );
-        _mint(treasury, initialSupply);
-        unpause();
+        _unpause();
+        _mint(_msgSender(), initialSupply);
     }
 }
