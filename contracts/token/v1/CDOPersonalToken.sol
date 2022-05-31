@@ -57,6 +57,7 @@ contract CDOPersonalToken is Initializable, ERC20PresetMinterPauserUpgradeable {
             "CDOPersonalToken: must have admin role to setup role"
         );
         _setupRole(ACTIVATE_ROLE, _bondingCurve);
+        _setupRole(MINTER_ROLE, _bondingCurve);
     }
 
     /**

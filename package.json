@@ -2,6 +2,7 @@
   "name": "candapo-project",
   "dependencies": {
     "@openzeppelin/hardhat-upgrades": "^1.14.0",
+    "abdk-libraries-solidity": "^3.0.0",
     "dotenv": "^16.0.0",
     "hardhat-contract-sizer": "^2.4.0",
     "hardhat-gas-reporter": "^1.0.7"

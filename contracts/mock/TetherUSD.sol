@@ -5,6 +5,6 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract TetherUSD is ERC20 {
     constructor() ERC20("Tether USD", "USDT") {
-        _mint(msg.sender, 1000000 * 10 ** decimals());
+        _mint(msg.sender, 1000000000 * 10 ** decimals());
     }
 }
