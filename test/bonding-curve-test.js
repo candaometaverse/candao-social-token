@@ -9,7 +9,7 @@ describe("Bonding Curve", function () {
   const DELTA = 1000;
 
   beforeEach(async function () {
-    const [_, ptTreasury, protocolTreasury, user] = await ethers.getSigners();
+    const [_, personalTokenCreator, protocolAdmin, user] = await ethers.getSigners();
 
     // Deploy USDT token
     const TetherUSDToken = await ethers.getContractFactory("TetherUSD");
@@ -24,26 +24,27 @@ describe("Bonding Curve", function () {
 
     // Deploy bounding curve
     const CDOBondingCurve = await ethers.getContractFactory("CDOBondingCurve");
-    bondingCurve = await CDOBondingCurve.deploy(token.address, ptTreasury.address, protocolTreasury.address, usdtToken.address);
+    bondingCurve = await CDOBondingCurve.connect(personalTokenCreator).deploy(token.address, protocolAdmin.address, usdtToken.address);
+
+    // Transfer token ownership to the CDOBondingCurve pool
+    (await token.transferOwnership(bondingCurve.address)).wait();
   });
 
   it("Should instantiate bonding curve", async function () {
-    const [_, ptTreasury, protocolTreasury] = await ethers.getSigners();
+    const [_, personalTokenCreator, protocolFeeReceiver] = await ethers.getSigners();
     expect(await bondingCurve.isActive()).to.equal(false);
-    expect(await bondingCurve.token()).to.equal(token.address);
-    expect(await bondingCurve.ptTreasury()).to.equal(ptTreasury.address);
-    expect(await bondingCurve.protocolTreasury()).to.equal(protocolTreasury.address);
+    expect(await bondingCurve.personalToken()).to.equal(token.address);
+    expect(await bondingCurve.owner()).to.equal(personalTokenCreator.address);
+    expect(await bondingCurve.protocolFeeReceiver()).to.equal(protocolFeeReceiver.address);
     expect(await bondingCurve.currentPrice()).to.equal(0);
-    expect(await bondingCurve.ptTreasuryAmount()).to.equal(0);
+    expect(await bondingCurve.ownerTreasuryAmount()).to.equal(0);
     expect(await bondingCurve.protocolTreasuryAmount()).to.equal(0);
   });
 
   it("Should activate bonding curve", async function () {
-    // Set minter role to bounding curve
-    (await token.grantRole(await token.MINTER_ROLE(), bondingCurve.address)).wait();
-
     // Activate bonding curve pool
-    (await bondingCurve.activate()).wait();
+    const [_, personalTokenCreator] = await ethers.getSigners();
+    (await bondingCurve.connect(personalTokenCreator).activate()).wait();
 
     // Checking state after activation
     expect(await token.totalSupply()).to.equal(ethers.utils.parseUnits("1"));
@@ -51,16 +52,14 @@ describe("Bonding Curve", function () {
     expect(await usdtToken.balanceOf(bondingCurve.address)).to.equal(0);
     expect(await bondingCurve.isActive()).to.equal(true);
     expect(await bondingCurve.currentPrice()).to.equal(0);
-    expect(await bondingCurve.ptTreasuryAmount()).to.equal(0);
+    expect(await bondingCurve.ownerTreasuryAmount()).to.equal(0);
     expect(await bondingCurve.protocolTreasuryAmount()).to.equal(0);
   });
 
   it("Should calculate BUY price", async function () {
-    // Set minter role to bounding curve
-    (await token.grantRole(await token.MINTER_ROLE(), bondingCurve.address)).wait();
-
     // Activate bonding curve pool
-    (await bondingCurve.activate()).wait();
+    const [_, personalTokenCreator] = await ethers.getSigners();
+    (await bondingCurve.connect(personalTokenCreator).activate()).wait();
 
     // Calculate buy price
     expect(await bondingCurve.calculateBuyPrice(ethers.utils.parseUnits("0.001")))
@@ -82,11 +81,9 @@ describe("Bonding Curve", function () {
   });
 
   it("Should calculate SELL price", async function () {
-    // Set minter role to bounding curve
-    (await token.grantRole(await token.MINTER_ROLE(), bondingCurve.address)).wait();
-
     // Activate bonding curve pool
-    (await bondingCurve.activate()).wait();
+    const [_, personalTokenCreator] = await ethers.getSigners();
+    (await bondingCurve.connect(personalTokenCreator).activate()).wait();
 
     // Buy 1 mln tokens
     const [, , , user] = await ethers.getSigners();
