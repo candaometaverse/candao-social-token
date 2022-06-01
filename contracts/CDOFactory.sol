@@ -2,11 +2,15 @@
 pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./CDOBondingCurve.sol";
+import "@openzeppelin/contracts/proxy/Clones.sol";
 import "./token/CDOPersonalToken.sol";
+import "./CDOBondingCurve.sol";
 
 contract CDOFactory is Ownable {
+    using Clones for address;
+
+    address public personalTokenImplementation;
+    address public personalTokenPoolImplementation;
 
     event CreatePersonalToken(
         address indexed personalTokenCreator,
@@ -14,29 +18,43 @@ contract CDOFactory is Ownable {
         address indexed personalTokenPool
     );
 
-    constructor() {}
+    constructor(address personalTokenImplementationAddress, address personalTokenPoolImplementationAddress) {
+        personalTokenImplementation = personalTokenImplementationAddress;
+        personalTokenPoolImplementation = personalTokenPoolImplementationAddress;
+    }
 
     function createPersonalToken(
         string memory name,
         string memory symbol,
-        address usdtToken
+        address usdtToken,
+        uint256 transactionFee
     ) external {
         // Create personal token
-        CDOPersonalToken personalToken = new CDOPersonalToken(name, symbol);
+        address personalToken = personalTokenImplementation.clone();
+        CDOPersonalToken(personalToken).initialize(name, symbol);
 
         // Create personal token pool
-        CDOBondingCurve pool = new CDOBondingCurve(
-            address(personalToken),
-            owner(),
-            usdtToken
-        );
+        address pool = personalTokenPoolImplementation.clone();
+        CDOBondingCurve(pool).initialize(personalToken, owner(), usdtToken, transactionFee);
 
         // Enable the pool to mint tokens
-        personalToken.transferOwnership(address(pool));
+        CDOPersonalToken(personalToken).transferOwnership(pool);
 
         // Transfer ownership of the pool to message sender
-        pool.transferOwnership(_msgSender());
+        CDOBondingCurve(pool).transferOwnership(_msgSender());
 
         emit CreatePersonalToken(_msgSender(), address(personalToken), address(pool));
+    }
+
+    function setPersonalTokenImplementation(address tokenImplementation) onlyOwner external {
+        require(tokenImplementation != address(0), "CDOFactory: invalid address");
+
+        personalTokenImplementation = tokenImplementation;
+    }
+
+    function setPersonalTokenPoolImplementation(address poolImplementation) onlyOwner external {
+        require(poolImplementation != address(0), "CDOFactory: invalid address");
+
+        personalTokenPoolImplementation = poolImplementation;
     }
 }

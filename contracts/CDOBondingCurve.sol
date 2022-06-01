@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "./token/CDOPersonalToken.sol";
 import "abdk-libraries-solidity/ABDKMath64x64.sol";
 
-contract CDOBondingCurve is Ownable {
-    using SafeERC20 for ERC20;
-    using SafeERC20 for CDOPersonalToken;
-    using SafeMath for uint256;
+contract CDOBondingCurve is Initializable, OwnableUpgradeable {
+    using SafeERC20Upgradeable for ERC20Upgradeable;
+    using SafeERC20Upgradeable for CDOPersonalToken;
+    using SafeMathUpgradeable for uint256;
     using ABDKMath64x64 for int128;
 
     uint256 public constant INITIAL_SUPPLY = 10 ** 18;
@@ -36,7 +37,7 @@ contract CDOBondingCurve is Ownable {
     uint256 public ownerTreasuryAmount;
     uint256 public protocolTreasuryAmount;
     // The fee is in 0.01% units, so value 30 means 0.3%.
-    uint256 public transactionFee = 30;
+    uint256 public transactionFee;
 
     event BuyPersonalTokens(
         address indexed buyer,
@@ -57,11 +58,12 @@ contract CDOBondingCurve is Ownable {
      * @param protocolFeeReceiverAddress The address for all protocol fees
      * @param usdtTokenAddress The address of payment token for personal tokens
      */
-    constructor(
+    function initialize(
         address personalTokenAddress,
         address protocolFeeReceiverAddress,
-        address usdtTokenAddress
-    ) {
+        address usdtTokenAddress,
+        uint256 transactionFeeValue
+    ) initializer public {
         require(_addressIsValid(personalTokenAddress), ERROR_ADDRESS);
         require(_addressIsValid(protocolFeeReceiverAddress), ERROR_ADDRESS);
         require(_addressIsValid(usdtTokenAddress), ERROR_ADDRESS);
@@ -69,6 +71,8 @@ contract CDOBondingCurve is Ownable {
         personalToken = CDOPersonalToken(personalTokenAddress);
         protocolFeeReceiver = protocolFeeReceiverAddress;
         usdtToken = usdtTokenAddress;
+        transactionFee = transactionFeeValue;
+        __Ownable_init();
     }
 
     /**
@@ -96,9 +100,9 @@ contract CDOBondingCurve is Ownable {
         uint256 ptFee = fee.sub(protocolFee);
 
         // Transfer USDT tokens
-        ERC20(usdtToken).safeTransferFrom(_msgSender(), address(this), price);
-        ERC20(usdtToken).safeTransferFrom(_msgSender(), protocolFeeReceiver, protocolFee);
-        ERC20(usdtToken).safeTransferFrom(_msgSender(), owner(), ptFee);
+        ERC20Upgradeable(usdtToken).safeTransferFrom(_msgSender(), address(this), price);
+        ERC20Upgradeable(usdtToken).safeTransferFrom(_msgSender(), protocolFeeReceiver, protocolFee);
+        ERC20Upgradeable(usdtToken).safeTransferFrom(_msgSender(), owner(), ptFee);
 
         // Mint personal tokens for buyer
         personalToken.mint(_msgSender(), amount);
@@ -127,9 +131,9 @@ contract CDOBondingCurve is Ownable {
         uint256 ptFee = fee.sub(protocolFee);
 
         // Transfer USDT tokens
-        ERC20(usdtToken).safeTransfer(_msgSender(), withdrawalAmount);
-        ERC20(usdtToken).safeTransfer(protocolFeeReceiver, protocolFee);
-        ERC20(usdtToken).safeTransfer(owner(), ptFee);
+        ERC20Upgradeable(usdtToken).safeTransfer(_msgSender(), withdrawalAmount);
+        ERC20Upgradeable(usdtToken).safeTransfer(protocolFeeReceiver, protocolFee);
+        ERC20Upgradeable(usdtToken).safeTransfer(owner(), ptFee);
 
         // Burn tokens
         personalToken.burnFrom(_msgSender(), amount);

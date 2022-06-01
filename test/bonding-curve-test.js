@@ -20,11 +20,12 @@ describe("Bonding Curve", function () {
 
     // Deploy personal token
     const CDOPersonalToken = await ethers.getContractFactory("CDOPersonalToken");
-    token = await CDOPersonalToken.deploy('CDOPersonalToken', 'CDO');
+    token = await upgrades.deployProxy(CDOPersonalToken, ['CDOPersonalToken', 'CDO']);
 
     // Deploy bounding curve
     const CDOBondingCurve = await ethers.getContractFactory("CDOBondingCurve");
-    bondingCurve = await CDOBondingCurve.connect(personalTokenCreator).deploy(token.address, protocolAdmin.address, usdtToken.address);
+    bondingCurve = await upgrades.deployProxy(CDOBondingCurve.connect(personalTokenCreator),
+      [token.address, protocolAdmin.address, usdtToken.address, 30]);
 
     // Transfer token ownership to the CDOBondingCurve pool
     (await token.transferOwnership(bondingCurve.address)).wait();
