@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "./token/v1/CDOPersonalToken.sol";
+import "./token/CDOPersonalToken.sol";
 import "abdk-libraries-solidity/ABDKMath64x64.sol";
 
 contract CDOBondingCurve is AccessControl, ReentrancyGuard {
@@ -80,7 +80,7 @@ contract CDOBondingCurve is AccessControl, ReentrancyGuard {
             hasRole(DEFAULT_ADMIN_ROLE, _msgSender()),
             "CDOPersonalToken: must have admin role to activate"
         );
-        token.activate(INITIAL_SUPPLY);
+        token.mint(address(this), INITIAL_SUPPLY);
         isActive = true;
     }
 

@@ -20,7 +20,7 @@ describe("Bonding Curve", function () {
 
     // Deploy personal token
     const CDOPersonalToken = await ethers.getContractFactory("CDOPersonalToken");
-    token = await upgrades.deployProxy(CDOPersonalToken, ['CDOPersonalToken', 'CDO']);
+    token = await CDOPersonalToken.deploy('CDOPersonalToken', 'CDO');
 
     // Deploy bounding curve
     const CDOBondingCurve = await ethers.getContractFactory("CDOBondingCurve");
@@ -39,8 +39,8 @@ describe("Bonding Curve", function () {
   });
 
   it("Should activate bonding curve", async function () {
-    // Set activation role to bounding curve
-    (await token.setupActivateRole(bondingCurve.address)).wait();
+    // Set minter role to bounding curve
+    (await token.grantRole(await token.MINTER_ROLE(), bondingCurve.address)).wait();
 
     // Activate bonding curve pool
     (await bondingCurve.activate()).wait();
@@ -56,8 +56,8 @@ describe("Bonding Curve", function () {
   });
 
   it("Should calculate BUY price", async function () {
-    // Set activation role to bounding curve
-    (await token.setupActivateRole(bondingCurve.address)).wait();
+    // Set minter role to bounding curve
+    (await token.grantRole(await token.MINTER_ROLE(), bondingCurve.address)).wait();
 
     // Activate bonding curve pool
     (await bondingCurve.activate()).wait();
@@ -82,8 +82,8 @@ describe("Bonding Curve", function () {
   });
 
   it("Should calculate SELL price", async function () {
-    // Set activation role to bounding curve
-    (await token.setupActivateRole(bondingCurve.address)).wait();
+    // Set minter role to bounding curve
+    (await token.grantRole(await token.MINTER_ROLE(), bondingCurve.address)).wait();
 
     // Activate bonding curve pool
     (await bondingCurve.activate()).wait();
