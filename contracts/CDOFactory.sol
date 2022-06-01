@@ -11,6 +11,9 @@ contract CDOFactory is Ownable {
 
     address public personalTokenImplementation;
     address public personalTokenPoolImplementation;
+    address public protocolFeeReceiver;
+
+    string private constant ERROR_ADDRESS = "CDOPersonalToken: invalid address";
 
     event CreatePersonalToken(
         address indexed personalTokenCreator,
@@ -18,9 +21,18 @@ contract CDOFactory is Ownable {
         address indexed personalTokenPool
     );
 
-    constructor(address personalTokenImplementationAddress, address personalTokenPoolImplementationAddress) {
+    constructor(
+        address personalTokenImplementationAddress,
+        address personalTokenPoolImplementationAddress,
+        address protocolFeeReceiverAddress
+    ) {
+        require(_addressIsValid(personalTokenImplementationAddress), ERROR_ADDRESS);
+        require(_addressIsValid(personalTokenPoolImplementationAddress), ERROR_ADDRESS);
+        require(_addressIsValid(protocolFeeReceiverAddress), ERROR_ADDRESS);
+
         personalTokenImplementation = personalTokenImplementationAddress;
         personalTokenPoolImplementation = personalTokenPoolImplementationAddress;
+        protocolFeeReceiver = protocolFeeReceiverAddress;
     }
 
     function createPersonalToken(
@@ -35,7 +47,7 @@ contract CDOFactory is Ownable {
 
         // Create personal token pool
         address pool = personalTokenPoolImplementation.clone();
-        CDOBondingCurve(pool).initialize(personalToken, owner(), usdtToken, transactionFee);
+        CDOBondingCurve(pool).initialize(personalToken, protocolFeeReceiver, usdtToken, transactionFee);
 
         // Enable the pool to mint tokens
         CDOPersonalToken(personalToken).transferOwnership(pool);
@@ -47,14 +59,27 @@ contract CDOFactory is Ownable {
     }
 
     function setPersonalTokenImplementation(address tokenImplementation) onlyOwner external {
-        require(tokenImplementation != address(0), "CDOFactory: invalid address");
+        require(_addressIsValid(tokenImplementation), ERROR_ADDRESS);
 
         personalTokenImplementation = tokenImplementation;
     }
 
     function setPersonalTokenPoolImplementation(address poolImplementation) onlyOwner external {
-        require(poolImplementation != address(0), "CDOFactory: invalid address");
+        require(_addressIsValid(poolImplementation), ERROR_ADDRESS);
 
         personalTokenPoolImplementation = poolImplementation;
+    }
+
+    function setProtocolFeeReceiver(address feeReceiver) onlyOwner external {
+        require(_addressIsValid(feeReceiver), ERROR_ADDRESS);
+
+        protocolFeeReceiver = feeReceiver;
+    }
+
+    /**
+     * @dev Checks if address is not empty
+     */
+    function _addressIsValid(address _addr) internal pure returns (bool) {
+        return _addr != address(0);
     }
 }
