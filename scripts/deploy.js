@@ -14,18 +14,20 @@ async function main() {
   const personalTokenImplementation = await CDOPersonalToken.deploy();
   await personalTokenImplementation.deployed();
 
+  console.log("Personal token implementation address:", personalTokenImplementation.address);
+
   // Deploy personal token implementation
   const CDOBondingCurve = await ethers.getContractFactory("CDOBondingCurve");
   const poolImplementation = await CDOBondingCurve.deploy();
   await poolImplementation.deployed();
+
+  console.log("Pool implementation address:", poolImplementation.address);
 
   // Deploy factory
   const Factory = await ethers.getContractFactory("CDOFactory");
   const factory = await Factory.deploy(personalTokenImplementation.address, poolImplementation.address, deployer.address);
   await factory.deployed();
 
-  console.log("Personal token implementation address:", personalTokenImplementation.address);
-  console.log("Pool implementation address:", poolImplementation.address);
   console.log("Factory address:", factory.address);
 }
 

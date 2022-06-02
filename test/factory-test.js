@@ -1,7 +1,7 @@
 const {expect} = require("chai");
 const {ethers} = require("hardhat");
 
-describe("Bonding Curve", function () {
+describe("Factory", function () {
 
   let factory;
   let personalTokenImplementation;
