@@ -9,6 +9,11 @@ import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "./token/CDOPersonalToken.sol";
 import "abdk-libraries-solidity/ABDKMath64x64.sol";
 
+error Unauthorized();
+error InvalidAddress();
+error NotActivePool();
+error PoolAlreadyActivated();
+
 contract CDOBondingCurve is Initializable, OwnableUpgradeable {
     using SafeERC20Upgradeable for ERC20Upgradeable;
     using SafeERC20Upgradeable for CDOPersonalToken;
@@ -23,9 +28,6 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
     int128 private constant _DIVIDER = 1000 << 64;
     int128 private constant _AVG_DIVIDER = 2 << 64;
     uint256 private constant _DECIMALS = 10 ** 18;
-
-    string private constant ERROR_ADDRESS = "CDOPersonalToken: invalid address";
-    string private constant ERROR_NOT_ACTIVE = "CDOPersonalToken: pool is not active";
 
     CDOPersonalToken public personalToken;
     address public protocolFeeReceiver;
@@ -64,9 +66,12 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
         address usdtTokenAddress,
         uint256 transactionFeeValue
     ) initializer public {
-        require(_addressIsValid(personalTokenAddress), ERROR_ADDRESS);
-        require(_addressIsValid(protocolFeeReceiverAddress), ERROR_ADDRESS);
-        require(_addressIsValid(usdtTokenAddress), ERROR_ADDRESS);
+        if (!_addressIsValid(personalTokenAddress))
+            revert InvalidAddress();
+        if (!_addressIsValid(protocolFeeReceiverAddress))
+            revert InvalidAddress();
+        if (!_addressIsValid(usdtTokenAddress))
+            revert InvalidAddress();
 
         personalToken = CDOPersonalToken(personalTokenAddress);
         protocolFeeReceiver = protocolFeeReceiverAddress;
@@ -80,7 +85,8 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
      * It can be called only once.
      */
     function activate() external onlyOwner() {
-        require(!isActive, "CDOPersonalToken: pool is already activated");
+        if (isActive)
+            revert PoolAlreadyActivated();
 
         personalToken.mint(address(this), INITIAL_SUPPLY);
         isActive = true;
@@ -90,7 +96,8 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
      * @dev Buy certain amount of personal tokens.
      */
     function buy(uint256 amount) external {
-        require(isActive, ERROR_NOT_ACTIVE);
+        if (!isActive)
+            revert NotActivePool();
 
         // Calculate deposit and fees
         uint256 tokenPrice = calculateBuyPrice(amount);
@@ -120,7 +127,8 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
      * @dev Sell certain amount of personal tokens.
      */
     function sell(uint256 amount) external {
-        require(isActive, ERROR_NOT_ACTIVE);
+        if (!isActive)
+            revert NotActivePool();
 
         // Calculate withdrawal and fees
         uint256 tokenPrice = calculateSellPrice(amount);

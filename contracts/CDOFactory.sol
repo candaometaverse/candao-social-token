@@ -26,9 +26,12 @@ contract CDOFactory is Ownable {
         address personalTokenPoolImplementationAddress,
         address protocolFeeReceiverAddress
     ) {
-        require(_addressIsValid(personalTokenImplementationAddress), ERROR_ADDRESS);
-        require(_addressIsValid(personalTokenPoolImplementationAddress), ERROR_ADDRESS);
-        require(_addressIsValid(protocolFeeReceiverAddress), ERROR_ADDRESS);
+        if (!_addressIsValid(personalTokenImplementationAddress))
+            revert InvalidAddress();
+        if (!_addressIsValid(personalTokenPoolImplementationAddress))
+            revert InvalidAddress();
+        if (!_addressIsValid(protocolFeeReceiverAddress))
+            revert InvalidAddress();
 
         personalTokenImplementation = personalTokenImplementationAddress;
         personalTokenPoolImplementation = personalTokenPoolImplementationAddress;
@@ -41,6 +44,9 @@ contract CDOFactory is Ownable {
         address usdtToken,
         uint256 transactionFee
     ) external {
+        if (!_addressIsValid(usdtToken))
+            revert InvalidAddress();
+
         // Create personal token
         address personalToken = personalTokenImplementation.clone();
         CDOPersonalToken(personalToken).initialize(name, symbol);
@@ -59,19 +65,22 @@ contract CDOFactory is Ownable {
     }
 
     function setPersonalTokenImplementation(address tokenImplementation) onlyOwner external {
-        require(_addressIsValid(tokenImplementation), ERROR_ADDRESS);
+        if (!_addressIsValid(tokenImplementation))
+            revert InvalidAddress();
 
         personalTokenImplementation = tokenImplementation;
     }
 
     function setPersonalTokenPoolImplementation(address poolImplementation) onlyOwner external {
-        require(_addressIsValid(poolImplementation), ERROR_ADDRESS);
+        if (!_addressIsValid(poolImplementation))
+            revert InvalidAddress();
 
         personalTokenPoolImplementation = poolImplementation;
     }
 
     function setProtocolFeeReceiver(address feeReceiver) onlyOwner external {
-        require(_addressIsValid(feeReceiver), ERROR_ADDRESS);
+        if (!_addressIsValid(feeReceiver))
+            revert InvalidAddress();
 
         protocolFeeReceiver = feeReceiver;
     }
