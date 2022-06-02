@@ -7,27 +7,26 @@ const { ethers, upgrades } = require("hardhat");
 require("dotenv").config()
 
 async function main() {
-  // Hardhat always runs the compile task when running scripts with its command
-  // line interface.
-  //
-  // If this script is run directly using `node` you may want to call compile
-  // manually to make sure everything is compiled
-  // await hre.run('compile');
+  const [deployer] = await ethers.getSigners();
 
-  // We get the contract to deploy
+  // Deploy personal token implementation
   const CDOPersonalToken = await ethers.getContractFactory("CDOPersonalToken");
-  const cdoPT = await upgrades.deployProxy(CDOPersonalToken, ['CDOPersonalToken', 'CDO']);
+  const personalTokenImplementation = await CDOPersonalToken.deploy();
+  await personalTokenImplementation.deployed();
 
-  await cdoPT.deployed();
-  const implAddress = upgrades.erc1967.getImplementationAddress(cdoPT.address);
-  console.log(implAddress);
-  console.log("CDOPersonalToken deployed to:", cdoPT.address);
-
+  // Deploy personal token implementation
   const CDOBondingCurve = await ethers.getContractFactory("CDOBondingCurve");
-  const bondingcurve_instance = await CDOBondingCurve.deploy(cdoPT.address, process.env.PT_TREASURY, process.env.PROTOCOL_TREASURY, process.env.USDT_ADDRESS);
+  const poolImplementation = await CDOBondingCurve.deploy();
+  await poolImplementation.deployed();
 
-  console.log("CDO Bonding Curve deployed to:", bondingcurve_instance.address);
+  // Deploy factory
+  const Factory = await ethers.getContractFactory("CDOFactory");
+  const factory = await Factory.deploy(personalTokenImplementation.address, poolImplementation.address, deployer.address);
+  await factory.deployed();
 
+  console.log("Personal token implementation address:", personalTokenImplementation.address);
+  console.log("Pool implementation address:", poolImplementation.address);
+  console.log("Factory address:", factory.address);
 }
 
 // We recommend this pattern to be able to use async/await everywhere
