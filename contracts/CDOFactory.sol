@@ -64,21 +64,21 @@ contract CDOFactory is Ownable {
         emit CreatePersonalToken(_msgSender(), address(personalToken), address(pool));
     }
 
-    function setPersonalTokenImplementation(address tokenImplementation) onlyOwner external {
+    function setPersonalTokenImplementation(address tokenImplementation) external onlyOwner {
         if (!_addressIsValid(tokenImplementation))
             revert InvalidAddress();
 
         personalTokenImplementation = tokenImplementation;
     }
 
-    function setPersonalTokenPoolImplementation(address poolImplementation) onlyOwner external {
+    function setPersonalTokenPoolImplementation(address poolImplementation) external onlyOwner {
         if (!_addressIsValid(poolImplementation))
             revert InvalidAddress();
 
         personalTokenPoolImplementation = poolImplementation;
     }
 
-    function setProtocolFeeReceiver(address feeReceiver) onlyOwner external {
+    function setProtocolFeeReceiver(address feeReceiver) external onlyOwner {
         if (!_addressIsValid(feeReceiver))
             revert InvalidAddress();
 

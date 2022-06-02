@@ -9,10 +9,10 @@ import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "./token/CDOPersonalToken.sol";
 import "abdk-libraries-solidity/ABDKMath64x64.sol";
 
-error Unauthorized();
-error InvalidAddress();
-error NotActivePool();
-error PoolAlreadyActivated();
+    error Unauthorized();
+    error InvalidAddress();
+    error NotActivePool();
+    error PoolAlreadyActivated();
 
 contract CDOBondingCurve is Initializable, OwnableUpgradeable {
     using SafeERC20Upgradeable for ERC20Upgradeable;
@@ -65,7 +65,7 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
         address protocolFeeReceiverAddress,
         address usdtTokenAddress,
         uint256 transactionFeeValue
-    ) initializer public {
+    ) public initializer {
         if (!_addressIsValid(personalTokenAddress))
             revert InvalidAddress();
         if (!_addressIsValid(protocolFeeReceiverAddress))
@@ -183,6 +183,26 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
         uint256 nextTotalSupply = totalSupply.sub(amount);
         int128 price = _price(ABDKMath64x64.divu(totalSupply, _DECIMALS), ABDKMath64x64.divu(nextTotalSupply, _DECIMALS));
         return ABDKMath64x64.mulu(price, _DECIMALS);
+    }
+
+    /**
+     * @dev Calculates deposit amount to send
+     */
+    function simulateBuy(uint256 amount) public view returns (uint256) {
+        uint256 tokenPrice = calculateBuyPrice(amount);
+        uint256 price = amount.mul(tokenPrice).div(_DECIMALS);
+        uint256 fee = price.mul(transactionFee).div(FEE_BASE);
+        return price.add(fee);
+    }
+
+    /**
+     * @dev Calculates withdrawal amount
+     */
+    function simulateSell(uint256 amount) public view returns (uint256) {
+        uint256 tokenPrice = calculateSellPrice(amount);
+        uint256 price = amount.mul(tokenPrice).div(_DECIMALS);
+        uint256 fee = price.mul(transactionFee).div(FEE_BASE);
+        return price.sub(fee);
     }
 
     /**

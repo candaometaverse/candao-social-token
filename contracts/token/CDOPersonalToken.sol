@@ -6,9 +6,16 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20Burnable
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-contract CDOPersonalToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, OwnableUpgradeable {
-
-    function initialize(string memory name, string memory symbol) initializer public {
+contract CDOPersonalToken is
+    Initializable,
+    ERC20Upgradeable,
+    ERC20BurnableUpgradeable,
+    OwnableUpgradeable
+{
+    function initialize(string memory name, string memory symbol)
+        public
+        initializer
+    {
         __ERC20_init(name, symbol);
         __ERC20Burnable_init();
         __Ownable_init();
