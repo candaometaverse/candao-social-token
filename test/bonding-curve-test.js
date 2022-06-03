@@ -6,7 +6,7 @@ describe("Bonding Curve", function () {
   let token;
   let usdtToken;
   let bondingCurve;
-  const DELTA = 1000;
+  const DELTA = 1;
 
   beforeEach(async function () {
     const [_, personalTokenCreator, protocolAdmin, user] = await ethers.getSigners();
@@ -16,7 +16,7 @@ describe("Bonding Curve", function () {
     usdtToken = await TetherUSDToken.deploy();
 
     // Transfer 10 mln tokens to user
-    (await usdtToken.transfer(user.address, ethers.utils.parseUnits("10000000"))).wait();
+    (await usdtToken.transfer(user.address, ethers.utils.parseUnits("10000000", 6))).wait();
 
     // Deploy personal token
     const CDOPersonalToken = await ethers.getContractFactory("CDOPersonalToken");
@@ -64,21 +64,21 @@ describe("Bonding Curve", function () {
 
     // Calculate buy price
     expect(await bondingCurve.calculateBuyPrice(ethers.utils.parseUnits("0.001")))
-      .to.closeTo(ethers.utils.parseUnits("0.001000166611141950"), DELTA);
+      .to.equal(ethers.utils.parseUnits("0.001000", 6));
     expect(await bondingCurve.calculateBuyPrice(ethers.utils.parseUnits("1")))
-      .to.closeTo(ethers.utils.parseUnits("0.001129960524947440"), DELTA);
+      .to.equal(ethers.utils.parseUnits("0.001129", 6));
     expect(await bondingCurve.calculateBuyPrice(ethers.utils.parseUnits("1000")))
-      .to.closeTo(ethers.utils.parseUnits("0.005501666111419550"), DELTA);
+      .to.equal(ethers.utils.parseUnits("0.005501", 6));
     expect(await bondingCurve.calculateBuyPrice(ethers.utils.parseUnits("2000")))
-      .to.closeTo(ethers.utils.parseUnits("0.006800655008742170"), DELTA);
+      .to.equal(ethers.utils.parseUnits("0.006800", 6));
     expect(await bondingCurve.calculateBuyPrice(ethers.utils.parseUnits("3000")))
-      .to.closeTo(ethers.utils.parseUnits("0.007712049012287050"), DELTA);
+      .to.equal(ethers.utils.parseUnits("0.007712", 6));
     expect(await bondingCurve.calculateBuyPrice(ethers.utils.parseUnits("5000")))
-      .to.closeTo(ethers.utils.parseUnits("0.009050449687370470"), DELTA);
+      .to.equal(ethers.utils.parseUnits("0.009050", 6));
     expect(await bondingCurve.calculateBuyPrice(ethers.utils.parseUnits("1000000")))
-      .to.closeTo(ethers.utils.parseUnits("0.050500016666661100"), DELTA);
+      .to.equal(ethers.utils.parseUnits("0.050500", 6));
     expect(await bondingCurve.calculateBuyPrice(ethers.utils.parseUnits("1000000000")))
-      .to.closeTo(ethers.utils.parseUnits("0.500500000166666000"), DELTA);
+      .to.equal(ethers.utils.parseUnits("0.500500", 6));
   });
 
   it("Should calculate SELL price", async function () {
@@ -87,26 +87,26 @@ describe("Bonding Curve", function () {
     (await bondingCurve.connect(personalTokenCreator).activate()).wait();
 
     // Buy 1 mln tokens
-    await usdtToken.connect(user).increaseAllowance(bondingCurve.address, "50500016666661111000000" + "151500049999983333000");
+    await usdtToken.connect(user).increaseAllowance(bondingCurve.address, "50651500000");
     (await bondingCurve.connect(user).buy(ethers.utils.parseUnits("1000000"))).wait();
 
     expect(await token.totalSupply()).to.equal(ethers.utils.parseEther("1000001"));
 
     // Calculate sell price
     expect(await bondingCurve.calculateSellPrice(ethers.utils.parseUnits("0.001")))
-      .to.closeTo(ethers.utils.parseUnits("0.100000033316656000"), DELTA);
+      .to.equal(ethers.utils.parseUnits("0.100000", 6));
     expect(await bondingCurve.calculateSellPrice(ethers.utils.parseUnits("1")))
-      .to.closeTo(ethers.utils.parseUnits("0.100000016666661000"), DELTA);
+      .to.equal(ethers.utils.parseUnits("0.100000", 6));
     expect(await bondingCurve.calculateSellPrice(ethers.utils.parseUnits("1000")))
-      .to.closeTo(ethers.utils.parseUnits("0.099983361119131900"), DELTA);
+      .to.equal(ethers.utils.parseUnits("0.099983", 6));
     expect(await bondingCurve.calculateSellPrice(ethers.utils.parseUnits("2000")))
-      .to.closeTo(ethers.utils.parseUnits("0.099966677775301600"), DELTA);
+      .to.equal(ethers.utils.parseUnits("0.099966", 6));
     expect(await bondingCurve.calculateSellPrice(ethers.utils.parseUnits("3000")))
-      .to.closeTo(ethers.utils.parseUnits("0.099949983283238700"), DELTA);
+      .to.equal(ethers.utils.parseUnits("0.099949", 6));
     expect(await bondingCurve.calculateSellPrice(ethers.utils.parseUnits("5000")))
-      .to.closeTo(ethers.utils.parseUnits("0.099916560779794800"), DELTA);
+      .to.equal(ethers.utils.parseUnits("0.099916", 6));
     expect(await bondingCurve.calculateSellPrice(ethers.utils.parseUnits("1000000")))
-      .to.closeTo(ethers.utils.parseUnits("0.050500016666661100"), DELTA);
+      .to.equal(ethers.utils.parseUnits("0.050500", 6));
   });
 
   it("Should BUY and SELL tokens", async function () {
@@ -121,11 +121,11 @@ describe("Bonding Curve", function () {
 
     // Checking state
     expect(await token.totalSupply()).to.equal(ethers.utils.parseUnits("1001"));
-    expect(await bondingCurve.marketCap()).to.closeTo(ethers.utils.parseUnits("5.501666111419550000"), DELTA*100);
-    expect(await bondingCurve.ownerTreasuryAmount()).to.equal(ethers.utils.parseUnits("0.008252499167129321"));
-    expect(await bondingCurve.protocolTreasuryAmount()).to.equal(ethers.utils.parseUnits("0.008252499167129320"));
-    expect(await usdtToken.balanceOf(personalTokenCreator.address)).to.equal(ethers.utils.parseUnits("0.008252499167129321"));
-    expect(await usdtToken.balanceOf(protocolAdmin.address)).to.equal(ethers.utils.parseUnits("0.008252499167129320"));
+    expect(await bondingCurve.marketCap()).to.equal(ethers.utils.parseUnits("5.501000", 6));
+    expect(await bondingCurve.ownerTreasuryAmount()).to.equal(ethers.utils.parseUnits("0.008252", 6));
+    expect(await bondingCurve.protocolTreasuryAmount()).to.equal(ethers.utils.parseUnits("0.008251",6));
+    expect(await usdtToken.balanceOf(personalTokenCreator.address)).to.equal(ethers.utils.parseUnits("0.008252", 6));
+    expect(await usdtToken.balanceOf(protocolAdmin.address)).to.equal(ethers.utils.parseUnits("0.008251", 6));
 
     // Buy 2000 tokens
     depositAmount = await bondingCurve.simulateBuy(ethers.utils.parseUnits("2000"));
@@ -134,11 +134,11 @@ describe("Bonding Curve", function () {
 
     // Checking state
     expect(await token.totalSupply()).to.equal(ethers.utils.parseUnits("3001"));
-    expect(await bondingCurve.marketCap()).to.closeTo(ethers.utils.parseUnits("29.929096358832800000"), DELTA*100);
-    expect(await bondingCurve.ownerTreasuryAmount()).to.equal(ethers.utils.parseUnits("0.044893644538249127"));
-    expect(await bondingCurve.protocolTreasuryAmount()).to.equal(ethers.utils.parseUnits("0.044893644538249126"));
-    expect(await usdtToken.balanceOf(personalTokenCreator.address)).to.equal(ethers.utils.parseUnits("0.044893644538249127"));
-    expect(await usdtToken.balanceOf(protocolAdmin.address)).to.equal(ethers.utils.parseUnits("0.044893644538249126"));
+    expect(await bondingCurve.marketCap()).to.equal(ethers.utils.parseUnits("29.927000", 6));
+    expect(await bondingCurve.ownerTreasuryAmount()).to.equal(ethers.utils.parseUnits("0.044891", 6));
+    expect(await bondingCurve.protocolTreasuryAmount()).to.equal(ethers.utils.parseUnits("0.044890", 6));
+    expect(await usdtToken.balanceOf(personalTokenCreator.address)).to.equal(ethers.utils.parseUnits("0.044891", 6));
+    expect(await usdtToken.balanceOf(protocolAdmin.address)).to.equal(ethers.utils.parseUnits("0.044890", 6));
 
     // Sell 1000 token
     await token.connect(user).increaseAllowance(bondingCurve.address, ethers.utils.parseUnits("1000"));
@@ -146,9 +146,9 @@ describe("Bonding Curve", function () {
 
     // Checking state
     expect(await token.totalSupply()).to.equal(ethers.utils.parseUnits("2001"));
-    expect(await bondingCurve.marketCap()).to.closeTo(ethers.utils.parseUnits("16.416392337803500000"), DELTA*100);
-    expect(await bondingCurve.ownerTreasuryAmount()).to.equal(ethers.utils.parseUnits("0.065162700569792963"));
-    expect(await bondingCurve.protocolTreasuryAmount()).to.equal(ethers.utils.parseUnits("0.065162700569792962"));
+    expect(await bondingCurve.marketCap()).to.equal(ethers.utils.parseUnits("16.415000", 6));
+    expect(await bondingCurve.ownerTreasuryAmount()).to.equal(ethers.utils.parseUnits("0.065159", 6));
+    expect(await bondingCurve.protocolTreasuryAmount()).to.equal(ethers.utils.parseUnits("0.065158", 6));
     expect(await token.balanceOf(user.address)).to.equal(ethers.utils.parseUnits("2000"));
   });
 
@@ -164,7 +164,7 @@ describe("Bonding Curve", function () {
     let depositAmount = await bondingCurve.simulateBuy(ethers.utils.parseUnits("1000"));
     await usdtToken.connect(user).increaseAllowance(bondingCurve.address, depositAmount);
     (await bondingCurve.connect(user).buy(ethers.utils.parseUnits("1000"))).wait();
-    expect(await bondingCurve.ownerTreasuryAmount()).to.equal(ethers.utils.parseUnits("0.082524991671293205"));
-    expect(await bondingCurve.protocolTreasuryAmount()).to.equal(ethers.utils.parseUnits("0.082524991671293205"));
+    expect(await bondingCurve.ownerTreasuryAmount()).to.equal(ethers.utils.parseUnits("0.082515", 6));
+    expect(await bondingCurve.protocolTreasuryAmount()).to.equal(ethers.utils.parseUnits("0.082515", 6));
   });
 });

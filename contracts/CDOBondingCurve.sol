@@ -21,8 +21,8 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
     using ABDKMath64x64 for int128;
 
     uint256 public constant INITIAL_SUPPLY = 10 ** 18;
-    uint16 public constant FEE_BASE = 10000;
-    uint8 public constant PROTOCOL_PERCENTAGE_FEE = 50;
+    uint256 public constant FEE_BASE = 10000;
+    uint256 public constant PROTOCOL_PERCENTAGE_FEE = 50;
 
     int128 private constant _POWER_DIVIDER = 3 << 64;
     int128 private constant _DIVIDER = 1000 << 64;
@@ -171,7 +171,7 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
         uint256 totalSupply = personalToken.totalSupply();
         uint256 nextTotalSupply = totalSupply.add(amount);
         int128 price = _price(ABDKMath64x64.divu(totalSupply, _DECIMALS), ABDKMath64x64.divu(nextTotalSupply, _DECIMALS));
-        return ABDKMath64x64.mulu(price, _DECIMALS);
+        return ABDKMath64x64.mulu(price, 10 ** ERC20Upgradeable(usdtToken).decimals());
     }
 
     /**
@@ -182,7 +182,7 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
         uint256 totalSupply = personalToken.totalSupply();
         uint256 nextTotalSupply = totalSupply.sub(amount);
         int128 price = _price(ABDKMath64x64.divu(totalSupply, _DECIMALS), ABDKMath64x64.divu(nextTotalSupply, _DECIMALS));
-        return ABDKMath64x64.mulu(price, _DECIMALS);
+        return ABDKMath64x64.mulu(price, 10 ** ERC20Upgradeable(usdtToken).decimals());
     }
 
     /**
