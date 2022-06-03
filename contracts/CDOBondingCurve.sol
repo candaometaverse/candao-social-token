@@ -209,14 +209,14 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
      * @dev Calculates the price using the logarithmic bonding curve algorithm.
      * Calculates equation ( x^(1/3)/1000 + y^(1/3)/1000 ) / 2
      */
-    function _price(int128 x, int128 y) public pure returns (int128) {
+    function _price(int128 x, int128 y) internal pure returns (int128) {
         return (_power(x).div(_DIVIDER).add(_power(y).div(_DIVIDER))).div(_AVG_DIVIDER);
     }
 
     /**
      * @dev Calculates x^(1/3), which is equivalent to e^(ln(x)/3)
      */
-    function _power(int128 x) public pure returns (int128) {
+    function _power(int128 x) internal pure returns (int128) {
         // e^(ln(x)/3)
         return (x.ln().div(_POWER_DIVIDER)).exp();
     }
