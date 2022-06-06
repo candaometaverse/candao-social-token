@@ -1,245 +1,230 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.4;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "./token/v1/CDOPersonalToken.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
+import "./token/CDOSocialToken.sol";
+import "abdk-libraries-solidity/ABDKMath64x64.sol";
 
-contract CDOBondingCurve is AccessControl, ReentrancyGuard {
-    using SafeERC20 for ERC20;
-    using SafeERC20 for CDOPersonalToken;
-    using SafeMath for uint256;
+    error Unauthorized();
+    error InvalidAddress();
+    error NotActivePool();
+    error PoolAlreadyActivated();
 
-    /**
-    Hardcoded constants to save gas
-    bytes32 public constant OPEN_ROLE                    = keccak256("OPEN_ROLE");
-    */
-    bytes32 public constant OPEN_ROLE =
-        0xefa06053e2ca99a43c97c4a4f3d8a394ee3323a8ff237e625fba09fe30ceb0a4;
+contract CDOBondingCurve is Initializable, OwnableUpgradeable {
+    using SafeERC20Upgradeable for ERC20Upgradeable;
+    using SafeERC20Upgradeable for CDOSocialToken;
+    using SafeMathUpgradeable for uint256;
+    using ABDKMath64x64 for int128;
 
-    uint256 public constant INITIAL_SUPPLY = 10000 * 10**18; // 10 000 CDO
-    uint8 public constant PCT_BASE = 100;
-    uint8 public constant FEE_BASE = 25;
-    uint8 public constant MC_AGGREGATION = 23;
-    uint8 public constant PT_BASE = 1;
-    uint8 public constant PROTOCOL_BASE = 1;
+    uint256 public constant INITIAL_SUPPLY = 10 ** 18;
+    uint256 public constant FEE_BASE = 10000;
+    uint256 public constant PROTOCOL_PERCENTAGE_FEE = 50;
 
-    string private constant ERROR_ADDRESS = "MM_ADDRESS_IS_EOA";
-    string private constant ERROR_NOT_OPEN = "MM_NOT_OPEN";
-    string private constant ERROR_NOT_DEPOSIT = "MM_DEPOSIT_USDT_ERROR";
-    string private constant ERROR_NOT_WITHDRAW = "MM_WITHDRAW_USDT_ERROR";
-    string private constant ERROR_NOT_ENOUGH_USDT =
-        "MM_INSUFFICIENT_USDT_ERROR";
-    string private constant ERROR_NOT_ENOUGH_ALLOWANCE =
-        "MM_INSUFFICIENT_ALLOWANCE";
+    int128 private constant _POWER_DIVIDER = 3 << 64;
+    int128 private constant _DIVIDER = 1000 << 64;
+    int128 private constant _AVG_DIVIDER = 2 << 64;
+    uint256 private constant _DECIMALS = 10 ** 18;
 
-    CDOPersonalToken public token;
-    address public PT_treasury;
-    address public Protocol_treasury;
-    address public usdt_token;
+    CDOSocialToken public socialToken;
+    address public protocolFeeReceiver;
+    address public usdtToken;
 
-    bool public isOpen;
+    bool public isActive;
     uint256 public marketCap;
     uint256 public currentPrice;
-    uint256 public ptTreasuryAmount;
+    uint256 public ownerTreasuryAmount;
     uint256 public protocolTreasuryAmount;
+    // The fee is in 0.01% units, so value 30 means 0.3%.
+    uint256 public transactionFee;
 
-    event Open(bool indexed status);
-    event BuyPT(
+    event BuySocialTokens(
         address indexed buyer,
         uint256 indexed buyAmount,
-        uint256 indexed buyPrice
+        uint256 indexed buyPrice,
+        uint256 fee
     );
-    event SellPT(
+    event SellSocialTokens(
         address indexed seller,
         uint256 indexed sellAmount,
-        uint256 indexed sellPrice
+        uint256 indexed sellPrice,
+        uint256 fee
     );
 
     /**
-     * @notice Initialize market maker
-     * @param _token The address of CDOPersonalToken contract
-     * @param _ptTreasury The address of
+     * @dev Initialize market maker
+     * @param socialTokenAddress The address of CDOsocialToken contract
+     * @param protocolFeeReceiverAddress The address for all protocol fees
+     * @param usdtTokenAddress The address of payment token for social tokens
      */
-    constructor(
-        address _token,
-        address _ptTreasury,
-        address _protocolTreasury,
-        address _usdtToken
-    ) {
-        require(_addressIsValid(_ptTreasury), ERROR_ADDRESS);
-        require(_addressIsValid(_protocolTreasury), ERROR_ADDRESS);
-        require(_addressIsValid(_usdtToken), ERROR_ADDRESS);
+    function initialize(
+        address socialTokenAddress,
+        address protocolFeeReceiverAddress,
+        address usdtTokenAddress,
+        uint256 transactionFeeValue
+    ) public initializer {
+        if (!_addressIsValid(socialTokenAddress))
+            revert InvalidAddress();
+        if (!_addressIsValid(protocolFeeReceiverAddress))
+            revert InvalidAddress();
+        if (!_addressIsValid(usdtTokenAddress))
+            revert InvalidAddress();
 
-        _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
-
-        token = CDOPersonalToken(_token);
-        PT_treasury = _ptTreasury;
-        Protocol_treasury = _protocolTreasury;
-        usdt_token = _usdtToken;
-    }
-
-    function activate(address _treasury, uint256 _depositAmount) external {
-        require(
-            hasRole(DEFAULT_ADMIN_ROLE, _msgSender()),
-            "CDOPersonalToken: must have admin role to activate"
-        );
-        token.activate(_treasury, INITIAL_SUPPLY);
-        marketCap = _depositAmount.add(
-            _calculateFee(_depositAmount).mul(uint256(MC_AGGREGATION)).div(
-                uint256(FEE_BASE)
-            )
-        );
-        ptTreasuryAmount = _calculateBuyPT(_depositAmount);
-        protocolTreasuryAmount = _calculateBuyProtocol(_depositAmount);
-        currentPrice = marketCap.div(INITIAL_SUPPLY);
-        ERC20(usdt_token).safeTransfer(address(this), _depositAmount);
-        ERC20(usdt_token).safeTransfer(PT_treasury, ptTreasuryAmount);
-        ERC20(usdt_token).safeTransfer(
-            Protocol_treasury,
-            protocolTreasuryAmount
-        );
-        isOpen = true;
-    }
-
-    function buy(uint256 _buyAmount) external nonReentrant {
-        require(isOpen, ERROR_NOT_OPEN);
-        uint256 _depositAmount = currentPrice.mul(_buyAmount);
-        uint256 _PTAmount = _calculateBuyPT(_depositAmount);
-        uint256 _ProtocolAmount = _calculateBuyProtocol(_depositAmount);
-        require(
-            ERC20(usdt_token).balanceOf(_msgSender()) >=
-                _depositAmount.add(_calculateFee(_depositAmount)),
-            ERROR_NOT_ENOUGH_USDT
-        );
-        require(
-            ERC20(usdt_token).allowance(_msgSender(), address(this)) >=
-                _depositAmount.add(_calculateFee(_depositAmount)),
-            ERROR_NOT_ENOUGH_ALLOWANCE
-        );
-
-        ERC20(usdt_token).safeTransferFrom(_msgSender(), address(this), _depositAmount);
-        ERC20(usdt_token).safeTransferFrom(_msgSender(), PT_treasury, _PTAmount);
-        ERC20(usdt_token).safeTransferFrom(_msgSender(), Protocol_treasury, _ProtocolAmount);
-        token.mint(_msgSender(), _buyAmount);
-        emit BuyPT(_msgSender(), _buyAmount, currentPrice);
-        marketCap = marketCap.add(_calculateMC(_depositAmount));
-        ptTreasuryAmount = ptTreasuryAmount.add(_PTAmount);
-        protocolTreasuryAmount = protocolTreasuryAmount.add(_ProtocolAmount);
-        currentPrice = marketCap.div(token.totalSupply());
-    }
-
-    function sell(uint256 _sellAmount) external nonReentrant {
-        require(isOpen, ERROR_NOT_OPEN);
-        uint256 _withdrawAmount = currentPrice.mul(_sellAmount);
-        uint256 _PTAmount = _calculateSellPT(_withdrawAmount);
-        uint256 _ProtocolAmount = _calculateSellProtocol(_withdrawAmount);
-
-        token.burnFrom(_msgSender(), _sellAmount);
-        ERC20(usdt_token).safeIncreaseAllowance(_msgSender(), _withdrawAmount);
-        ERC20(usdt_token).safeTransferFrom(address(this), _msgSender(), _withdrawAmount);
-        ERC20(usdt_token).safeIncreaseAllowance(PT_treasury, _PTAmount);
-        ERC20(usdt_token).safeTransferFrom(address(this), PT_treasury, _PTAmount);
-        ERC20(usdt_token).safeIncreaseAllowance(Protocol_treasury, _ProtocolAmount);
-        ERC20(usdt_token).safeTransferFrom(address(this), Protocol_treasury, _ProtocolAmount);
-        emit SellPT(_msgSender(), _sellAmount, currentPrice);
-        marketCap = marketCap.sub(_calculateMC(_withdrawAmount));
-        ptTreasuryAmount = ptTreasuryAmount.add(_PTAmount);
-        protocolTreasuryAmount = protocolTreasuryAmount.add(_ProtocolAmount);
-        currentPrice = marketCap.div(token.totalSupply());
-    }
-
-    function upgradeUSDT(address _usdt) external {
-        require(
-            hasRole(DEFAULT_ADMIN_ROLE, _msgSender()),
-            "CDOPersonalToken: must have admin role to upgrade"
-        );
-
-        usdt_token = _usdt;
+        socialToken = CDOSocialToken(socialTokenAddress);
+        protocolFeeReceiver = protocolFeeReceiverAddress;
+        usdtToken = usdtTokenAddress;
+        transactionFee = transactionFeeValue;
+        __Ownable_init();
     }
 
     /**
-     * @notice Open market making [enabling users to open buy and sell orders]
+     * @dev Activate the pool, it unlocks buy and sell operations.
+     * It can be called only once.
      */
-    function open(bool _status) external onlyRole(OPEN_ROLE) {
-        _open(_status);
+    function activate() external onlyOwner() {
+        if (isActive)
+            revert PoolAlreadyActivated();
+
+        socialToken.mint(address(this), INITIAL_SUPPLY);
+        isActive = true;
     }
 
-    /* state modifiying functions */
+    /**
+     * @dev Buy certain amount of social tokens.
+     */
+    function buy(uint256 amount) external {
+        if (!isActive)
+            revert NotActivePool();
 
-    function _open(bool _status) internal {
-        isOpen = _status;
+        // Calculate deposit and fees
+        uint256 tokenPrice = calculateBuyPrice(amount);
+        uint256 price = amount.mul(tokenPrice).div(_DECIMALS);
+        uint256 fee = price.mul(transactionFee).div(FEE_BASE);
+        uint256 protocolFee = fee.mul(PROTOCOL_PERCENTAGE_FEE).div(100);
+        uint256 ptFee = fee.sub(protocolFee);
 
-        emit Open(_status);
+        // Transfer USDT tokens
+        ERC20Upgradeable(usdtToken).safeTransferFrom(_msgSender(), address(this), price);
+        ERC20Upgradeable(usdtToken).safeTransferFrom(_msgSender(), protocolFeeReceiver, protocolFee);
+        ERC20Upgradeable(usdtToken).safeTransferFrom(_msgSender(), owner(), ptFee);
+
+        // Mint social tokens for buyer
+        socialToken.mint(_msgSender(), amount);
+
+        // Update state
+        marketCap = marketCap.add(price);
+        protocolTreasuryAmount = protocolTreasuryAmount.add(protocolFee);
+        ownerTreasuryAmount = ownerTreasuryAmount.add(ptFee);
+        currentPrice = tokenPrice;
+
+        emit BuySocialTokens(_msgSender(), amount, currentPrice, fee);
     }
 
+    /**
+     * @dev Sell certain amount of social tokens.
+     */
+    function sell(uint256 amount) external {
+        if (!isActive)
+            revert NotActivePool();
+
+        // Calculate withdrawal and fees
+        uint256 tokenPrice = calculateSellPrice(amount);
+        uint256 price = amount.mul(tokenPrice).div(_DECIMALS);
+        uint256 fee = price.mul(transactionFee).div(FEE_BASE);
+        uint256 withdrawalAmount = price.sub(fee);
+        uint256 protocolFee = fee.mul(PROTOCOL_PERCENTAGE_FEE).div(100);
+        uint256 ptFee = fee.sub(protocolFee);
+
+        // Transfer USDT tokens
+        ERC20Upgradeable(usdtToken).safeTransfer(_msgSender(), withdrawalAmount);
+        ERC20Upgradeable(usdtToken).safeTransfer(protocolFeeReceiver, protocolFee);
+        ERC20Upgradeable(usdtToken).safeTransfer(owner(), ptFee);
+
+        // Burn tokens
+        socialToken.burnFrom(_msgSender(), amount);
+
+        // Update state
+        marketCap = marketCap.sub(price);
+        protocolTreasuryAmount = protocolTreasuryAmount.add(protocolFee);
+        ownerTreasuryAmount = ownerTreasuryAmount.add(ptFee);
+        currentPrice = tokenPrice;
+
+        emit SellSocialTokens(_msgSender(), amount, currentPrice, fee);
+    }
+
+    /**
+     * @dev Set transaction fee can be called only by owner.
+     * The fee is in 0.01% units, so value 30 means 0.3%.
+     */
+    function setTransactionFee(uint256 fee) external onlyOwner() {
+        transactionFee = fee;
+    }
+
+    /**
+     * @dev Calculates the purchase price of the token
+     * @param amount of tokens to buy
+     */
+    function calculateBuyPrice(uint256 amount) public view returns (uint256) {
+        uint256 totalSupply = socialToken.totalSupply();
+        uint256 nextTotalSupply = totalSupply.add(amount);
+        int128 price = _price(ABDKMath64x64.divu(totalSupply, _DECIMALS), ABDKMath64x64.divu(nextTotalSupply, _DECIMALS));
+        return ABDKMath64x64.mulu(price, 10 ** ERC20Upgradeable(usdtToken).decimals());
+    }
+
+    /**
+     * @dev Calculates the sell price of the token
+     * @param amount of tokens to sell
+     */
+    function calculateSellPrice(uint256 amount) public view returns (uint256) {
+        uint256 totalSupply = socialToken.totalSupply();
+        uint256 nextTotalSupply = totalSupply.sub(amount);
+        int128 price = _price(ABDKMath64x64.divu(totalSupply, _DECIMALS), ABDKMath64x64.divu(nextTotalSupply, _DECIMALS));
+        return ABDKMath64x64.mulu(price, 10 ** ERC20Upgradeable(usdtToken).decimals());
+    }
+
+    /**
+     * @dev Calculates deposit amount to send
+     */
+    function simulateBuy(uint256 amount) public view returns (uint256) {
+        uint256 tokenPrice = calculateBuyPrice(amount);
+        uint256 price = amount.mul(tokenPrice).div(_DECIMALS);
+        uint256 fee = price.mul(transactionFee).div(FEE_BASE);
+        return price.add(fee);
+    }
+
+    /**
+     * @dev Calculates withdrawal amount
+     */
+    function simulateSell(uint256 amount) public view returns (uint256) {
+        uint256 tokenPrice = calculateSellPrice(amount);
+        uint256 price = amount.mul(tokenPrice).div(_DECIMALS);
+        uint256 fee = price.mul(transactionFee).div(FEE_BASE);
+        return price.sub(fee);
+    }
+
+    /**
+     * @dev Calculates the price using the logarithmic bonding curve algorithm.
+     * Calculates equation ( x^(1/3)/1000 + y^(1/3)/1000 ) / 2
+     */
+    function _price(int128 x, int128 y) internal pure returns (int128) {
+        return (_power(x).div(_DIVIDER).add(_power(y).div(_DIVIDER))).div(_AVG_DIVIDER);
+    }
+
+    /**
+     * @dev Calculates x^(1/3), which is equivalent to e^(ln(x)/3)
+     */
+    function _power(int128 x) internal pure returns (int128) {
+        // e^(ln(x)/3)
+        return (x.ln().div(_POWER_DIVIDER)).exp();
+    }
+
+    /**
+     * @dev Checks if address is not empty
+     */
     function _addressIsValid(address _addr) internal pure returns (bool) {
         return _addr != address(0);
-    }
-
-    function _calculateFee(uint256 _Amount) internal pure returns (uint256) {
-        return _Amount.mul(uint256(FEE_BASE)).div(uint256(PCT_BASE));
-    }
-
-    function _calculateBuyPT(uint256 _depositAmount)
-        internal
-        pure
-        returns (uint256)
-    {
-        return
-            _calculateFee(_depositAmount).mul(uint256(PT_BASE)).div(
-                uint256(MC_AGGREGATION).add(uint256(PT_BASE)).add(
-                    uint256(PROTOCOL_BASE)
-                )
-            );
-    }
-
-    function _calculateBuyProtocol(uint256 _depositAmount)
-        internal
-        pure
-        returns (uint256)
-    {
-        return
-            _calculateFee(_depositAmount).mul(uint256(PROTOCOL_BASE)).div(
-                uint256(MC_AGGREGATION).add(uint256(PT_BASE)).add(
-                    uint256(PROTOCOL_BASE)
-                )
-            );
-    }
-
-    function _calculateSellPT(uint256 _withdrawAmount)
-        internal
-        pure
-        returns (uint256)
-    {
-        return
-            _calculateFee(_withdrawAmount).mul(uint256(PT_BASE)).div(
-                uint256(PT_BASE).add(uint256(PROTOCOL_BASE))
-            );
-    }
-
-    function _calculateSellProtocol(uint256 _withdrawAmount)
-        internal
-        pure
-        returns (uint256)
-    {
-        return
-            _calculateFee(_withdrawAmount).mul(uint256(PROTOCOL_BASE)).div(
-                uint256(PT_BASE).add(uint256(PROTOCOL_BASE))
-            );
-    }
-
-    function _calculateMC(uint256 _Amount) internal pure returns (uint256) {
-        return
-            _Amount.add(
-                _calculateFee(_Amount).mul(uint256(MC_AGGREGATION)).div(
-                    uint256(MC_AGGREGATION).add(uint256(PT_BASE)).add(
-                        uint256(PROTOCOL_BASE)
-                    )
-                )
-            );
     }
 }
