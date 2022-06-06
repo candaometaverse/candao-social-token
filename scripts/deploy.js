@@ -9,14 +9,14 @@ require("dotenv").config()
 async function main() {
   const [deployer] = await ethers.getSigners();
 
-  // Deploy personal token implementation
-  const CDOPersonalToken = await ethers.getContractFactory("CDOPersonalToken");
-  const personalTokenImplementation = await CDOPersonalToken.deploy();
-  await personalTokenImplementation.deployed();
+  // Deploy social token implementation
+  const CDOSocialToken = await ethers.getContractFactory("CDOSocialToken");
+  const socialTokenImplementation = await CDOSocialToken.deploy();
+  await socialTokenImplementation.deployed();
 
-  console.log("Personal token implementation address:", personalTokenImplementation.address);
+  console.log("Social token implementation address:", socialTokenImplementation.address);
 
-  // Deploy personal token implementation
+  // Deploy social token implementation
   const CDOBondingCurve = await ethers.getContractFactory("CDOBondingCurve");
   const poolImplementation = await CDOBondingCurve.deploy();
   await poolImplementation.deployed();
@@ -25,7 +25,7 @@ async function main() {
 
   // Deploy factory
   const Factory = await ethers.getContractFactory("CDOFactory");
-  const factory = await Factory.deploy(personalTokenImplementation.address, poolImplementation.address, deployer.address);
+  const factory = await Factory.deploy(socialTokenImplementation.address, poolImplementation.address, deployer.address);
   await factory.deployed();
 
   console.log("Factory address:", factory.address);

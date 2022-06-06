@@ -47,12 +47,7 @@ module.exports = {
     currency: "USD",
   },
   etherscan: {
-    apiKey: {
-      // ethereum
-      rinkeby: process.env.ETHERSCAN_API_KEY,
-      // polygon
-      mumbai: process.env.POLYGONSCAN_API_KEY,
-    }
+    apiKey: process.env.POLYGONSCAN_API_KEY
   },
   contractSizer: {
     alphaSort: true,

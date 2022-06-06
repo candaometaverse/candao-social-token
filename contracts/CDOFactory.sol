@@ -3,42 +3,42 @@ pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
-import "./token/CDOPersonalToken.sol";
+import "./token/CDOSocialToken.sol";
 import "./CDOBondingCurve.sol";
 
 contract CDOFactory is Ownable {
     using Clones for address;
 
-    address public personalTokenImplementation;
-    address public personalTokenPoolImplementation;
+    address public socialTokenImplementation;
+    address public socialTokenPoolImplementation;
     address public protocolFeeReceiver;
 
-    string private constant ERROR_ADDRESS = "CDOPersonalToken: invalid address";
+    string private constant ERROR_ADDRESS = "invalid address";
 
-    event CreatePersonalToken(
-        address indexed personalTokenCreator,
-        address indexed personalToken,
-        address indexed personalTokenPool
+    event CreateSocialToken(
+        address indexed socialTokenCreator,
+        address indexed socialToken,
+        address indexed socialTokenPool
     );
 
     constructor(
-        address personalTokenImplementationAddress,
-        address personalTokenPoolImplementationAddress,
+        address socialTokenImplementationAddress,
+        address socialTokenPoolImplementationAddress,
         address protocolFeeReceiverAddress
     ) {
-        if (!_addressIsValid(personalTokenImplementationAddress))
+        if (!_addressIsValid(socialTokenImplementationAddress))
             revert InvalidAddress();
-        if (!_addressIsValid(personalTokenPoolImplementationAddress))
+        if (!_addressIsValid(socialTokenPoolImplementationAddress))
             revert InvalidAddress();
         if (!_addressIsValid(protocolFeeReceiverAddress))
             revert InvalidAddress();
 
-        personalTokenImplementation = personalTokenImplementationAddress;
-        personalTokenPoolImplementation = personalTokenPoolImplementationAddress;
+        socialTokenImplementation = socialTokenImplementationAddress;
+        socialTokenPoolImplementation = socialTokenPoolImplementationAddress;
         protocolFeeReceiver = protocolFeeReceiverAddress;
     }
 
-    function createPersonalToken(
+    function createSocialToken(
         string memory name,
         string memory symbol,
         address usdtToken,
@@ -47,35 +47,35 @@ contract CDOFactory is Ownable {
         if (!_addressIsValid(usdtToken))
             revert InvalidAddress();
 
-        // Create personal token
-        address personalToken = personalTokenImplementation.clone();
-        CDOPersonalToken(personalToken).initialize(name, symbol);
+        // Create social token
+        address socialToken = socialTokenImplementation.clone();
+        CDOSocialToken(socialToken).initialize(name, symbol);
 
-        // Create personal token pool
-        address pool = personalTokenPoolImplementation.clone();
-        CDOBondingCurve(pool).initialize(personalToken, protocolFeeReceiver, usdtToken, transactionFee);
+        // Create social token pool
+        address pool = socialTokenPoolImplementation.clone();
+        CDOBondingCurve(pool).initialize(socialToken, protocolFeeReceiver, usdtToken, transactionFee);
 
         // Enable the pool to mint tokens
-        CDOPersonalToken(personalToken).transferOwnership(pool);
+        CDOSocialToken(socialToken).transferOwnership(pool);
 
         // Transfer ownership of the pool to message sender
         CDOBondingCurve(pool).transferOwnership(_msgSender());
 
-        emit CreatePersonalToken(_msgSender(), address(personalToken), address(pool));
+        emit CreateSocialToken(_msgSender(), address(socialToken), address(pool));
     }
 
-    function setPersonalTokenImplementation(address tokenImplementation) external onlyOwner {
+    function setSocialTokenImplementation(address tokenImplementation) external onlyOwner {
         if (!_addressIsValid(tokenImplementation))
             revert InvalidAddress();
 
-        personalTokenImplementation = tokenImplementation;
+        socialTokenImplementation = tokenImplementation;
     }
 
-    function setPersonalTokenPoolImplementation(address poolImplementation) external onlyOwner {
+    function setSocialTokenPoolImplementation(address poolImplementation) external onlyOwner {
         if (!_addressIsValid(poolImplementation))
             revert InvalidAddress();
 
-        personalTokenPoolImplementation = poolImplementation;
+        socialTokenPoolImplementation = poolImplementation;
     }
 
     function setProtocolFeeReceiver(address feeReceiver) external onlyOwner {

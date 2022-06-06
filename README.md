@@ -1,18 +1,18 @@
-# Candao personal token
+# Candao social token
 
 Factory contract was deployed to Mumbai polygon network.
 
 ```
-CDOFactory address: 0xe07bEC4DeaD46267Bf45c4A48F103c214bD7162D
+CDOFactory address: 0xDa2506c12ba0d9fbAfF7EA2bbf6C04BA772f43E3
 ```
 
 ## How use factory ?
 
 1. Browse polygon scan with contract argument
-https://mumbai.polygonscan.com/address/0xe07bEC4DeaD46267Bf45c4A48F103c214bD7162D#code
+https://mumbai.polygonscan.com/address/0xDa2506c12ba0d9fbAfF7EA2bbf6C04BA772f43E3#code
 
-2. Create personal token
-It will create personal token contract and bounding curve pool
+2. Create social token
+It will create social token contract and bounding curve pool
 
 3. Activate the pool
 

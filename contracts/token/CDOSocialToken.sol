@@ -6,7 +6,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20Burnable
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-contract CDOPersonalToken is
+contract CDOSocialToken is
     Initializable,
     ERC20Upgradeable,
     ERC20BurnableUpgradeable,

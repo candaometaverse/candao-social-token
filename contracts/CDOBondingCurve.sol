@@ -6,7 +6,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeab
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
-import "./token/CDOPersonalToken.sol";
+import "./token/CDOSocialToken.sol";
 import "abdk-libraries-solidity/ABDKMath64x64.sol";
 
     error Unauthorized();
@@ -16,7 +16,7 @@ import "abdk-libraries-solidity/ABDKMath64x64.sol";
 
 contract CDOBondingCurve is Initializable, OwnableUpgradeable {
     using SafeERC20Upgradeable for ERC20Upgradeable;
-    using SafeERC20Upgradeable for CDOPersonalToken;
+    using SafeERC20Upgradeable for CDOSocialToken;
     using SafeMathUpgradeable for uint256;
     using ABDKMath64x64 for int128;
 
@@ -29,7 +29,7 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
     int128 private constant _AVG_DIVIDER = 2 << 64;
     uint256 private constant _DECIMALS = 10 ** 18;
 
-    CDOPersonalToken public personalToken;
+    CDOSocialToken public socialToken;
     address public protocolFeeReceiver;
     address public usdtToken;
 
@@ -41,13 +41,13 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
     // The fee is in 0.01% units, so value 30 means 0.3%.
     uint256 public transactionFee;
 
-    event BuyPersonalTokens(
+    event BuySocialTokens(
         address indexed buyer,
         uint256 indexed buyAmount,
         uint256 indexed buyPrice,
         uint256 fee
     );
-    event SellPersonalTokens(
+    event SellSocialTokens(
         address indexed seller,
         uint256 indexed sellAmount,
         uint256 indexed sellPrice,
@@ -56,24 +56,24 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
 
     /**
      * @dev Initialize market maker
-     * @param personalTokenAddress The address of CDOPersonalToken contract
+     * @param socialTokenAddress The address of CDOsocialToken contract
      * @param protocolFeeReceiverAddress The address for all protocol fees
-     * @param usdtTokenAddress The address of payment token for personal tokens
+     * @param usdtTokenAddress The address of payment token for social tokens
      */
     function initialize(
-        address personalTokenAddress,
+        address socialTokenAddress,
         address protocolFeeReceiverAddress,
         address usdtTokenAddress,
         uint256 transactionFeeValue
     ) public initializer {
-        if (!_addressIsValid(personalTokenAddress))
+        if (!_addressIsValid(socialTokenAddress))
             revert InvalidAddress();
         if (!_addressIsValid(protocolFeeReceiverAddress))
             revert InvalidAddress();
         if (!_addressIsValid(usdtTokenAddress))
             revert InvalidAddress();
 
-        personalToken = CDOPersonalToken(personalTokenAddress);
+        socialToken = CDOSocialToken(socialTokenAddress);
         protocolFeeReceiver = protocolFeeReceiverAddress;
         usdtToken = usdtTokenAddress;
         transactionFee = transactionFeeValue;
@@ -88,12 +88,12 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
         if (isActive)
             revert PoolAlreadyActivated();
 
-        personalToken.mint(address(this), INITIAL_SUPPLY);
+        socialToken.mint(address(this), INITIAL_SUPPLY);
         isActive = true;
     }
 
     /**
-     * @dev Buy certain amount of personal tokens.
+     * @dev Buy certain amount of social tokens.
      */
     function buy(uint256 amount) external {
         if (!isActive)
@@ -111,8 +111,8 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
         ERC20Upgradeable(usdtToken).safeTransferFrom(_msgSender(), protocolFeeReceiver, protocolFee);
         ERC20Upgradeable(usdtToken).safeTransferFrom(_msgSender(), owner(), ptFee);
 
-        // Mint personal tokens for buyer
-        personalToken.mint(_msgSender(), amount);
+        // Mint social tokens for buyer
+        socialToken.mint(_msgSender(), amount);
 
         // Update state
         marketCap = marketCap.add(price);
@@ -120,11 +120,11 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
         ownerTreasuryAmount = ownerTreasuryAmount.add(ptFee);
         currentPrice = tokenPrice;
 
-        emit BuyPersonalTokens(_msgSender(), amount, currentPrice, fee);
+        emit BuySocialTokens(_msgSender(), amount, currentPrice, fee);
     }
 
     /**
-     * @dev Sell certain amount of personal tokens.
+     * @dev Sell certain amount of social tokens.
      */
     function sell(uint256 amount) external {
         if (!isActive)
@@ -144,7 +144,7 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
         ERC20Upgradeable(usdtToken).safeTransfer(owner(), ptFee);
 
         // Burn tokens
-        personalToken.burnFrom(_msgSender(), amount);
+        socialToken.burnFrom(_msgSender(), amount);
 
         // Update state
         marketCap = marketCap.sub(price);
@@ -152,7 +152,7 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
         ownerTreasuryAmount = ownerTreasuryAmount.add(ptFee);
         currentPrice = tokenPrice;
 
-        emit SellPersonalTokens(_msgSender(), amount, currentPrice, fee);
+        emit SellSocialTokens(_msgSender(), amount, currentPrice, fee);
     }
 
     /**
@@ -168,7 +168,7 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
      * @param amount of tokens to buy
      */
     function calculateBuyPrice(uint256 amount) public view returns (uint256) {
-        uint256 totalSupply = personalToken.totalSupply();
+        uint256 totalSupply = socialToken.totalSupply();
         uint256 nextTotalSupply = totalSupply.add(amount);
         int128 price = _price(ABDKMath64x64.divu(totalSupply, _DECIMALS), ABDKMath64x64.divu(nextTotalSupply, _DECIMALS));
         return ABDKMath64x64.mulu(price, 10 ** ERC20Upgradeable(usdtToken).decimals());
@@ -179,7 +179,7 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
      * @param amount of tokens to sell
      */
     function calculateSellPrice(uint256 amount) public view returns (uint256) {
-        uint256 totalSupply = personalToken.totalSupply();
+        uint256 totalSupply = socialToken.totalSupply();
         uint256 nextTotalSupply = totalSupply.sub(amount);
         int128 price = _price(ABDKMath64x64.divu(totalSupply, _DECIMALS), ABDKMath64x64.divu(nextTotalSupply, _DECIMALS));
         return ABDKMath64x64.mulu(price, 10 ** ERC20Upgradeable(usdtToken).decimals());
