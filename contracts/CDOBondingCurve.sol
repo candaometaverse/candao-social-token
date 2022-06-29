@@ -79,7 +79,7 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
      * @dev Activate the pool, it unlocks buy and sell operations.
      * It can be called only once.
      */
-    function activate(address usdtTokenAddress) external onlyOwner() {
+    function activate(address usdtTokenAddress, uint256 amountToBuy) external onlyOwner() {
         if (!_addressIsValid(usdtTokenAddress))
             revert InvalidAddress();
         if (isActive)
@@ -87,14 +87,18 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
 
         usdtToken = usdtTokenAddress;
         isActive = true;
+
+        buy(amountToBuy);
     }
 
     /**
      * @dev Buy certain amount of social tokens.
      */
-    function buy(uint256 amount) external {
+    function buy(uint256 amount) public {
         if (!isActive)
             revert NotActivePool();
+        if (amount == 0)
+            return;
 
         // Calculate deposit and fees
         uint256 tokenPrice = calculateBuyPrice(amount);
@@ -126,6 +130,8 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
     function sell(uint256 amount) external {
         if (!isActive)
             revert NotActivePool();
+        if (amount == 0)
+            return;
 
         // Calculate withdrawal and fees
         uint256 tokenPrice = calculateSellPrice(amount);
@@ -165,10 +171,7 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
      * @param amount of tokens to buy
      */
     function calculateBuyPrice(uint256 amount) public view returns (uint256) {
-        uint256 totalSupply = socialToken.totalSupply();
-        uint256 nextTotalSupply = totalSupply.add(amount);
-        int128 price = _price(ABDKMath64x64.divu(totalSupply, _DECIMALS), ABDKMath64x64.divu(nextTotalSupply, _DECIMALS));
-        return ABDKMath64x64.mulu(price, 10 ** ERC20Upgradeable(usdtToken).decimals());
+        return _calculateBuyPrice(amount, usdtToken);
     }
 
     /**
@@ -193,6 +196,16 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
     }
 
     /**
+    * @dev Calculates deposit amount to send during activation
+     */
+    function simulateActivationBuy(uint256 amount, address usdtTokenAddress) public view returns (uint256) {
+        uint256 tokenPrice = _calculateBuyPrice(amount, usdtTokenAddress);
+        uint256 price = amount.mul(tokenPrice).div(_DECIMALS);
+        uint256 fee = price.mul(transactionFee).div(FEE_BASE);
+        return price.add(fee);
+    }
+
+    /**
      * @dev Calculates withdrawal amount
      */
     function simulateSell(uint256 amount) public view returns (uint256) {
@@ -201,6 +214,19 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
         uint256 fee = price.mul(transactionFee).div(FEE_BASE);
         return price.sub(fee);
     }
+
+    /**
+     * @dev Calculates the purchase price of the social token
+     * @param amount of social tokens to buy
+     * @param usdtTokenAddress the token to pay with
+     */
+    function _calculateBuyPrice(uint256 amount, address usdtTokenAddress) public view returns (uint256) {
+        uint256 totalSupply = socialToken.totalSupply();
+        uint256 nextTotalSupply = totalSupply.add(amount);
+        int128 price = _price(ABDKMath64x64.divu(totalSupply, _DECIMALS), ABDKMath64x64.divu(nextTotalSupply, _DECIMALS));
+        return ABDKMath64x64.mulu(price, 10 ** ERC20Upgradeable(usdtTokenAddress).decimals());
+    }
+
 
     /**
      * @dev Calculates the price using the logarithmic bonding curve algorithm.
