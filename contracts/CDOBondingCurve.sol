@@ -13,6 +13,10 @@ import "abdk-libraries-solidity/ABDKMath64x64.sol";
     error InvalidAddress();
     error NotActivePool();
     error PoolAlreadyActivated();
+    error InvalidTransactionFeeValue();
+    error InvalidMinimumMarketingBudgetValue();
+    error TooLowMarketingBudget();
+    error TooHighMarketingBudgetValue();
 
 contract CDOBondingCurve is Initializable, OwnableUpgradeable {
     using SafeERC20Upgradeable for ERC20Upgradeable;
@@ -20,7 +24,7 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
     using SafeMathUpgradeable for uint256;
     using ABDKMath64x64 for int128;
 
-    uint256 public constant FEE_BASE = 10000;
+    uint256 public constant MAX_BASE = 10000;
     uint256 public constant PROTOCOL_PERCENTAGE_FEE = 50;
 
     int128 private constant _POWER_DIVIDER = 3 << 64;
@@ -37,8 +41,12 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
     uint256 public currentPrice;
     uint256 public ownerTreasuryAmount;
     uint256 public protocolTreasuryAmount;
-    // The fee is in 0.01% units, so value 30 means 0.3%.
+    // The fee is in 0.01% units, so value 100 means 1%.
     uint256 public transactionFee;
+    // The marketing budget is in 0.01% units, so value 100 means 1%.
+    uint256 public marketingBudget;
+    uint256 public minMarketingBudget;
+    address public marketingPool;
 
     event BuySocialTokens(
         address indexed buyer,
@@ -62,16 +70,26 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
     function initialize(
         address socialTokenAddress,
         address protocolFeeReceiverAddress,
-        uint256 transactionFeeValue
+        uint256 transactionFeeValue,
+        address marketingPoolAddress,
+        uint256 minMarketingBudgetValue
     ) public initializer {
         if (!_addressIsValid(socialTokenAddress))
             revert InvalidAddress();
         if (!_addressIsValid(protocolFeeReceiverAddress))
             revert InvalidAddress();
+        if (!_addressIsValid(marketingPoolAddress))
+            revert InvalidAddress();
+        if (minMarketingBudgetValue > MAX_BASE)
+            revert InvalidMinimumMarketingBudgetValue();
+        if (transactionFeeValue > MAX_BASE)
+            revert InvalidTransactionFeeValue();
 
         socialToken = CDOSocialToken(socialTokenAddress);
         protocolFeeReceiver = protocolFeeReceiverAddress;
         transactionFee = transactionFeeValue;
+        marketingPool = marketingPoolAddress;
+        minMarketingBudget = minMarketingBudgetValue;
         __Ownable_init();
     }
 
@@ -79,22 +97,43 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
      * @dev Activate the pool, it unlocks buy and sell operations.
      * It can be called only once.
      */
-    function activate(address usdtTokenAddress, uint256 amountToBuy) external onlyOwner() {
+    function activate(address usdtTokenAddress, uint256 amountToBuy, uint256 marketingBudgetValue) external onlyOwner() {
         if (!_addressIsValid(usdtTokenAddress))
             revert InvalidAddress();
         if (isActive)
             revert PoolAlreadyActivated();
+        if (marketingBudgetValue < minMarketingBudget)
+            revert TooLowMarketingBudget();
+        if (marketingBudgetValue > MAX_BASE)
+            revert TooHighMarketingBudgetValue();
 
         usdtToken = usdtTokenAddress;
         isActive = true;
+        marketingBudget = marketingBudgetValue;
 
-        buy(amountToBuy);
+        // Buy first social tokens
+        _buy(amountToBuy, address(this));
+
+        // Transfer marketing budget to marketing pool
+        uint256 marketingBudgetAmount = amountToBuy.mul(marketingBudgetValue).div(MAX_BASE);
+        ERC20Upgradeable(socialToken).safeTransfer(marketingPool, marketingBudgetAmount);
+
+        // Transfer rest to message sender
+        ERC20Upgradeable(socialToken).safeTransfer(_msgSender(), amountToBuy - marketingBudgetAmount);
     }
 
     /**
      * @dev Buy certain amount of social tokens.
      */
-    function buy(uint256 amount) public {
+    function buy(uint256 amount) external {
+        _buy(amount, _msgSender());
+    }
+
+
+    /**
+     * @dev Buy certain amount of social tokens for recipient.
+     */
+    function _buy(uint256 amount, address recipient) internal {
         if (!isActive)
             revert NotActivePool();
         if (amount == 0)
@@ -103,7 +142,7 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
         // Calculate deposit and fees
         uint256 tokenPrice = calculateBuyPrice(amount);
         uint256 price = amount.mul(tokenPrice).div(_DECIMALS);
-        uint256 fee = price.mul(transactionFee).div(FEE_BASE);
+        uint256 fee = price.mul(transactionFee).div(MAX_BASE);
         uint256 protocolFee = fee.mul(PROTOCOL_PERCENTAGE_FEE).div(100);
         uint256 ptFee = fee.sub(protocolFee);
 
@@ -112,8 +151,8 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
         ERC20Upgradeable(usdtToken).safeTransferFrom(_msgSender(), protocolFeeReceiver, protocolFee);
         ERC20Upgradeable(usdtToken).safeTransferFrom(_msgSender(), owner(), ptFee);
 
-        // Mint social tokens for buyer
-        socialToken.mint(_msgSender(), amount);
+        // Mint social tokens for recipient
+        socialToken.mint(recipient, amount);
 
         // Update state
         marketCap = marketCap.add(price);
@@ -136,7 +175,7 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
         // Calculate withdrawal and fees
         uint256 tokenPrice = calculateSellPrice(amount);
         uint256 price = amount.mul(tokenPrice).div(_DECIMALS);
-        uint256 fee = price.mul(transactionFee).div(FEE_BASE);
+        uint256 fee = price.mul(transactionFee).div(MAX_BASE);
         uint256 withdrawalAmount = price.sub(fee);
         uint256 protocolFee = fee.mul(PROTOCOL_PERCENTAGE_FEE).div(100);
         uint256 ptFee = fee.sub(protocolFee);
@@ -191,7 +230,7 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
     function simulateBuy(uint256 amount) public view returns (uint256) {
         uint256 tokenPrice = calculateBuyPrice(amount);
         uint256 price = amount.mul(tokenPrice).div(_DECIMALS);
-        uint256 fee = price.mul(transactionFee).div(FEE_BASE);
+        uint256 fee = price.mul(transactionFee).div(MAX_BASE);
         return price.add(fee);
     }
 
@@ -201,7 +240,7 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
     function simulateActivationBuy(uint256 amount, address usdtTokenAddress) public view returns (uint256) {
         uint256 tokenPrice = _calculateBuyPrice(amount, usdtTokenAddress);
         uint256 price = amount.mul(tokenPrice).div(_DECIMALS);
-        uint256 fee = price.mul(transactionFee).div(FEE_BASE);
+        uint256 fee = price.mul(transactionFee).div(MAX_BASE);
         return price.add(fee);
     }
 
@@ -211,7 +250,7 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
     function simulateSell(uint256 amount) public view returns (uint256) {
         uint256 tokenPrice = calculateSellPrice(amount);
         uint256 price = amount.mul(tokenPrice).div(_DECIMALS);
-        uint256 fee = price.mul(transactionFee).div(FEE_BASE);
+        uint256 fee = price.mul(transactionFee).div(MAX_BASE);
         return price.sub(fee);
     }
 
@@ -220,7 +259,7 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
      * @param amount of social tokens to buy
      * @param usdtTokenAddress the token to pay with
      */
-    function _calculateBuyPrice(uint256 amount, address usdtTokenAddress) public view returns (uint256) {
+    function _calculateBuyPrice(uint256 amount, address usdtTokenAddress) internal view returns (uint256) {
         uint256 totalSupply = socialToken.totalSupply();
         uint256 nextTotalSupply = totalSupply.add(amount);
         int128 price = _price(ABDKMath64x64.divu(totalSupply, _DECIMALS), ABDKMath64x64.divu(nextTotalSupply, _DECIMALS));

@@ -12,6 +12,9 @@ contract CDOFactory is Ownable {
     address public socialTokenImplementation;
     address public socialTokenPoolImplementation;
     address public protocolFeeReceiver;
+    address public marketingPool;
+    // marketing budget is in 0.01% units so 100 = 1%
+    uint256 public minMarketingBudget;
 
     string private constant ERROR_ADDRESS = "invalid address";
 
@@ -24,7 +27,9 @@ contract CDOFactory is Ownable {
     constructor(
         address socialTokenImplementationAddress,
         address socialTokenPoolImplementationAddress,
-        address protocolFeeReceiverAddress
+        address protocolFeeReceiverAddress,
+        address marketingPoolAddress,
+        uint256 minMarketingBudgetValue
     ) {
         if (!_addressIsValid(socialTokenImplementationAddress))
             revert InvalidAddress();
@@ -32,20 +37,23 @@ contract CDOFactory is Ownable {
             revert InvalidAddress();
         if (!_addressIsValid(protocolFeeReceiverAddress))
             revert InvalidAddress();
+        if (!_addressIsValid(marketingPoolAddress))
+            revert InvalidAddress();
+        if (minMarketingBudgetValue > 10000)
+            revert InvalidMinimumMarketingBudgetValue();
 
         socialTokenImplementation = socialTokenImplementationAddress;
         socialTokenPoolImplementation = socialTokenPoolImplementationAddress;
         protocolFeeReceiver = protocolFeeReceiverAddress;
+        marketingPool = marketingPoolAddress;
+        minMarketingBudget = minMarketingBudgetValue;
     }
 
     function createSocialToken(
         string memory name,
         string memory symbol,
-//        address usdtToken,
         uint256 transactionFee
     ) external {
-//        if (!_addressIsValid(usdtToken))
-//            revert InvalidAddress();
 
         // Create social token
         address socialToken = socialTokenImplementation.clone();
@@ -53,7 +61,8 @@ contract CDOFactory is Ownable {
 
         // Create social token pool
         address pool = socialTokenPoolImplementation.clone();
-        CDOBondingCurve(pool).initialize(socialToken, protocolFeeReceiver, transactionFee);
+        CDOBondingCurve(pool).initialize(
+            socialToken, protocolFeeReceiver, transactionFee, marketingPool, minMarketingBudget);
 
         // Enable the pool to mint tokens
         CDOSocialToken(socialToken).transferOwnership(pool);
@@ -83,6 +92,20 @@ contract CDOFactory is Ownable {
             revert InvalidAddress();
 
         protocolFeeReceiver = feeReceiver;
+    }
+
+    function setMarketingPool(address marketingPoolAddress) external onlyOwner {
+        if (!_addressIsValid(marketingPoolAddress))
+            revert InvalidAddress();
+
+        marketingPool = marketingPoolAddress;
+    }
+
+    function setMinMarketingBudget(uint256 minMarketingBudgetValue) external onlyOwner {
+        if (minMarketingBudgetValue > 10000)
+            revert InvalidMinimumMarketingBudgetValue();
+
+        minMarketingBudget = minMarketingBudgetValue;
     }
 
     /**

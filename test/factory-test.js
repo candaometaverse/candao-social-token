@@ -9,7 +9,7 @@ describe("Factory", function () {
   let usdtToken;
 
   beforeEach(async function () {
-    const [_, , protocolFeeReceiver] = await ethers.getSigners();
+    const [_, , protocolFeeReceiver, marketingPool] = await ethers.getSigners();
 
     // Deploy USDT token
     const TetherUSDToken = await ethers.getContractFactory("TetherUSD");
@@ -25,15 +25,18 @@ describe("Factory", function () {
 
     // Deploy factory
     const Factory = await ethers.getContractFactory("CDOFactory");
-    factory = await Factory.deploy(socialTokenImplementation.address, poolImplementation.address, protocolFeeReceiver.address);
+    factory = await Factory.deploy(
+      socialTokenImplementation.address, poolImplementation.address, protocolFeeReceiver.address, marketingPool.address, 1000);
   });
 
   it("Should instantiate factory", async function () {
-    const [_, , protocolFeeReceiver] = await ethers.getSigners();
+    const [_, , protocolFeeReceiver, marketingPool] = await ethers.getSigners();
 
     expect(await factory.protocolFeeReceiver()).to.equal(protocolFeeReceiver.address);
     expect(await factory.socialTokenImplementation()).to.equal(socialTokenImplementation.address);
     expect(await factory.socialTokenPoolImplementation()).to.equal(poolImplementation.address);
+    expect(await factory.marketingPool()).to.equal(marketingPool.address);
+    expect(await factory.minMarketingBudget()).to.equal(1000);
   });
 
   it("Should create social token", async function () {
