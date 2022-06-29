@@ -25,7 +25,8 @@ async function main() {
 
   // Deploy factory
   const Factory = await ethers.getContractFactory("CDOFactory");
-  const factory = await Factory.deploy(socialTokenImplementation.address, poolImplementation.address, deployer.address);
+  const factory = await Factory.deploy(
+    socialTokenImplementation.address, poolImplementation.address, deployer.address, deployer.address, 1000);
   await factory.deployed();
 
   console.log("Factory address:", factory.address);
