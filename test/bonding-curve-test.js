@@ -24,7 +24,7 @@ describe("Bonding Curve", function () {
     // Deploy bounding curve
     const CDOBondingCurve = await ethers.getContractFactory("CDOBondingCurve");
     bondingCurve = await upgrades.deployProxy(CDOBondingCurve.connect(socialTokenCreator),
-      [token.address, protocolAdmin.address, usdtToken.address, 30]);
+      [token.address, protocolAdmin.address, 30]);
 
     // Transfer token ownership to the CDOBondingCurve pool
     (await token.transferOwnership(bondingCurve.address)).wait();
@@ -34,6 +34,7 @@ describe("Bonding Curve", function () {
     const [_, socialTokenCreator, protocolFeeReceiver] = await ethers.getSigners();
     expect(await bondingCurve.isActive()).to.equal(false);
     expect(await bondingCurve.socialToken()).to.equal(token.address);
+    expect(await token.totalSupply()).to.equal(ethers.utils.parseUnits("1"));
     expect(await bondingCurve.owner()).to.equal(socialTokenCreator.address);
     expect(await bondingCurve.protocolFeeReceiver()).to.equal(protocolFeeReceiver.address);
     expect(await bondingCurve.currentPrice()).to.equal(0);
@@ -44,11 +45,12 @@ describe("Bonding Curve", function () {
   it("Should activate bonding curve", async function () {
     // Activate bonding curve pool
     const [_, socialTokenCreator] = await ethers.getSigners();
-    (await bondingCurve.connect(socialTokenCreator).activate()).wait();
+    (await bondingCurve.connect(socialTokenCreator).activate(usdtToken.address)).wait();
 
     // Checking state after activation
     expect(await token.totalSupply()).to.equal(ethers.utils.parseUnits("1"));
-    expect(await token.balanceOf(bondingCurve.address)).to.equal(ethers.utils.parseUnits("1"));
+    expect(await bondingCurve.usdtToken()).to.equal(usdtToken.address);
+    expect(await token.balanceOf(token.address)).to.equal(ethers.utils.parseUnits("1"));
     expect(await usdtToken.balanceOf(bondingCurve.address)).to.equal(0);
     expect(await bondingCurve.isActive()).to.equal(true);
     expect(await bondingCurve.currentPrice()).to.equal(0);
@@ -59,7 +61,7 @@ describe("Bonding Curve", function () {
   it("Should calculate BUY price", async function () {
     // Activate bonding curve pool
     const [_, socialTokenCreator] = await ethers.getSigners();
-    (await bondingCurve.connect(socialTokenCreator).activate()).wait();
+    (await bondingCurve.connect(socialTokenCreator).activate(usdtToken.address)).wait();
 
     // Calculate buy price
     expect(await bondingCurve.calculateBuyPrice(ethers.utils.parseUnits("0.001")))
@@ -83,7 +85,7 @@ describe("Bonding Curve", function () {
   it("Should calculate SELL price", async function () {
     // Activate bonding curve pool
     const [, socialTokenCreator,,user] = await ethers.getSigners();
-    (await bondingCurve.connect(socialTokenCreator).activate()).wait();
+    (await bondingCurve.connect(socialTokenCreator).activate(usdtToken.address)).wait();
 
     // Buy 1 mln tokens
     await usdtToken.connect(user).increaseAllowance(bondingCurve.address, "50651500000");
@@ -111,7 +113,7 @@ describe("Bonding Curve", function () {
   it("Should BUY and SELL tokens", async function () {
     // Activate bonding curve pool
     const [_, socialTokenCreator,protocolAdmin,user] = await ethers.getSigners();
-    (await bondingCurve.connect(socialTokenCreator).activate()).wait();
+    (await bondingCurve.connect(socialTokenCreator).activate(usdtToken.address)).wait();
 
     // Buy 1000 tokens
     let depositAmount = await bondingCurve.simulateBuy(ethers.utils.parseUnits("1000"));
@@ -154,7 +156,7 @@ describe("Bonding Curve", function () {
   it("Should configure transaction FEE", async function () {
     // Activate bonding curve pool
     const [_, socialTokenCreator,,user] = await ethers.getSigners();
-    (await bondingCurve.connect(socialTokenCreator).activate()).wait();
+    (await bondingCurve.connect(socialTokenCreator).activate(usdtToken.address)).wait();
 
     // Set transaction fee
     (await bondingCurve.connect(socialTokenCreator).setTransactionFee(300)).wait();

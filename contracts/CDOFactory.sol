@@ -41,11 +41,11 @@ contract CDOFactory is Ownable {
     function createSocialToken(
         string memory name,
         string memory symbol,
-        address usdtToken,
+//        address usdtToken,
         uint256 transactionFee
     ) external {
-        if (!_addressIsValid(usdtToken))
-            revert InvalidAddress();
+//        if (!_addressIsValid(usdtToken))
+//            revert InvalidAddress();
 
         // Create social token
         address socialToken = socialTokenImplementation.clone();
@@ -53,7 +53,7 @@ contract CDOFactory is Ownable {
 
         // Create social token pool
         address pool = socialTokenPoolImplementation.clone();
-        CDOBondingCurve(pool).initialize(socialToken, protocolFeeReceiver, usdtToken, transactionFee);
+        CDOBondingCurve(pool).initialize(socialToken, protocolFeeReceiver, transactionFee);
 
         // Enable the pool to mint tokens
         CDOSocialToken(socialToken).transferOwnership(pool);

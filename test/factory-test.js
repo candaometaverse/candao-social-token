@@ -39,7 +39,7 @@ describe("Factory", function () {
   it("Should create social token", async function () {
     const [_, socialTokenCreator, protocolFeeReceiver] = await ethers.getSigners();
 
-    let tx = await factory.connect(socialTokenCreator).createSocialToken("TEST TOKEN", "TST", usdtToken.address, 50)
+    let tx = await factory.connect(socialTokenCreator).createSocialToken("TEST TOKEN", "TST", 50)
     let res = await tx.wait();
 
     let event = res.events?.filter((x) => {return x.event === "CreateSocialToken"})[0];
@@ -54,7 +54,7 @@ describe("Factory", function () {
 
     expect(await token.name()).to.equal("TEST TOKEN");
     expect(await token.symbol()).to.equal("TST");
-    expect(await token.totalSupply()).to.equal(0);
+    expect(await token.totalSupply()).to.equal(ethers.utils.parseUnits("1"));
     expect(await token.owner()).to.equal(poolAddress);
 
     expect(await pool.isActive()).to.equal(false);

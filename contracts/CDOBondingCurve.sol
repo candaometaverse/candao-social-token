@@ -20,7 +20,6 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
     using SafeMathUpgradeable for uint256;
     using ABDKMath64x64 for int128;
 
-    uint256 public constant INITIAL_SUPPLY = 10 ** 18;
     uint256 public constant FEE_BASE = 10000;
     uint256 public constant PROTOCOL_PERCENTAGE_FEE = 50;
 
@@ -58,24 +57,20 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
      * @dev Initialize market maker
      * @param socialTokenAddress The address of CDOsocialToken contract
      * @param protocolFeeReceiverAddress The address for all protocol fees
-     * @param usdtTokenAddress The address of payment token for social tokens
+     * @param transactionFeeValue all buy/sell transactions fee value
      */
     function initialize(
         address socialTokenAddress,
         address protocolFeeReceiverAddress,
-        address usdtTokenAddress,
         uint256 transactionFeeValue
     ) public initializer {
         if (!_addressIsValid(socialTokenAddress))
             revert InvalidAddress();
         if (!_addressIsValid(protocolFeeReceiverAddress))
             revert InvalidAddress();
-        if (!_addressIsValid(usdtTokenAddress))
-            revert InvalidAddress();
 
         socialToken = CDOSocialToken(socialTokenAddress);
         protocolFeeReceiver = protocolFeeReceiverAddress;
-        usdtToken = usdtTokenAddress;
         transactionFee = transactionFeeValue;
         __Ownable_init();
     }
@@ -84,11 +79,13 @@ contract CDOBondingCurve is Initializable, OwnableUpgradeable {
      * @dev Activate the pool, it unlocks buy and sell operations.
      * It can be called only once.
      */
-    function activate() external onlyOwner() {
+    function activate(address usdtTokenAddress) external onlyOwner() {
+        if (!_addressIsValid(usdtTokenAddress))
+            revert InvalidAddress();
         if (isActive)
             revert PoolAlreadyActivated();
 
-        socialToken.mint(address(this), INITIAL_SUPPLY);
+        usdtToken = usdtTokenAddress;
         isActive = true;
     }
 
